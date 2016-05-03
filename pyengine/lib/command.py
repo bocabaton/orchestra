@@ -36,6 +36,8 @@ class Command(object):
         self.user_meta = api_request['meta']['user']
         self.plugins = api_request['meta']['plugin']
         self.params = self._checkParam(api_request['params'])
+        if api_request['meta'].has_key('xtoken'):
+            self.xtoken = api_request['meta']['xtoken']
 
     def _checkParam(self, api_params):
         """

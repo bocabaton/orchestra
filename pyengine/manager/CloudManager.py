@@ -226,7 +226,7 @@ class CloudManager(Manager):
     ###############################################
     # Server 
     ###############################################
-    def createServer(self, params):
+    def createServer(self, params, ctx):
         """
         @param:
             {"zone_id":"xxxx-xxx-xxxxx-xxxxx",
@@ -240,6 +240,9 @@ class CloudManager(Manager):
                  }
               }
             }
+
+        @ctx: context
+            ctx['user_id']
 
         """
        
@@ -259,18 +262,26 @@ class CloudManager(Manager):
         #driver = self._getDriver(params['zone_id'])
         driver = self.locator.getManager('OpenStackDriver')
         # 2. Call deploy
-        auth = {"auth":{
-            "tenantName":"choonho.son",
-            "passwordCredentials":{
-                "username": "choonho.son",
-                "password": "123456"
-            }
-        }
-        }
+        usr_mgr = self.locator.getManager('UserManager')
+        platform = 'openstack'
+        auth_params = {'get':ctx['user_id'], 'platform':platform}
+        self.logger.debug("auth:%s" % auth_params)
+        auth = usr_mgr.getUserInfo(auth_params)
+        #auth = {"auth":{
+        #    "tenantName":"choonho.son",
+        #    "passwordCredentials":{
+        #        "username": "choonho.son",
+        #        "password": "123456"
+        #    }
+        #}
+        #}
         zone_id = params['zone_id']
         req = params['request']
         created_server = driver.deployServer(auth, zone_id, req)
         self.updateServerInfo(server.server_id, 'server_id', created_server['server_id'])
+        # Update Private IP address
+        if created_server.has_key('private_ip_address'):
+            self.updateServerInfo(server.server_id, 'private_ip_address', created_server['private_ip_address'])
 
         # Update server_info
         # ex) server_id from nova
@@ -279,6 +290,8 @@ class CloudManager(Manager):
             status = driver.getServerStatus(auth, zone_id, created_server['server_id'])
             if status.has_key('status'):
                 if status['status'] == 'ACTIVE':
+                    # Can find private address
+                    self.updateServerInfo(server.server_id, "private_ip_address", status['private_ip_address'])
                     break
                 else:
                     self.logger.info('Wait to active:%s' % status['status'])
@@ -329,6 +342,18 @@ class CloudManager(Manager):
             item[key] = value
         return item
 
+    def getServerInfo2(self, params):
+        """
+        @params:
+           {'get':key, 'server_id':server_id}
+        return server_info item 
+        """
+        items = self.getServerInfo(params['server_id'])
+        for key in items.keys():
+            if key == params['get']:
+                return {key: items[key]}
+        return {}
+
     #####################################
     # SSH executor
     #####################################
@@ -342,7 +367,7 @@ class CloudManager(Manager):
 
         # We have ssh connection
         self.logger.debug("CMD: %s" % params['cmd'])
-        stdin, stdout, stderr = ssh.exec_command(params['cmd'], bufsize=-1, get_pty=False)
+        stdin, stdout, stderr = ssh.exec_command(params['cmd'], bufsize=348160, timeout=300, get_pty=False)
 
         return {'result': stdout.readlines()}
 

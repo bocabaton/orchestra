@@ -1,14 +1,16 @@
-# Create Region
+# Authentication
 
-# Environment
+## Environment
 
 Keyword | Value | Description
 ----    | ----  | ----
 URL     | http://127.0.0.1/api/v1 | URL for request
-
-# Region/Zone
-
-Automatic Discovery based on OpenStack account 
+USER_ID     | sunshout | user_id for this system
+PASSWORD     | 123456 | password for this system
+TENANT_ID   | choonho.son | OpenStack tenant ID
+USER_ID2    | choonho.son | OpenStack User ID
+PASSWORD2   | 123456        | OpenStack Password
+# Reqeust token
 
 ~~~python
 import requests
@@ -62,38 +64,24 @@ def makeDelete(url, header):
     print r.text
     raise NameError(url)
 
-display('Auth')
+user_id='${USER_ID}'
 url = '${URL}/token/get'
-user_id='root'
-password='123456'
-body = {'user_id':user_id, 'password':password}
+body = {'user_id':user_id, 'password':'${PASSWORD}'}
 token = makePost(url, header, body)
 token_id = token['token']
+
+display('Request with token')
+url = '${URL}/catalog/products'
 header.update({'X-Auth-Token':token_id})
-
-
-display('Discovery Zone')
-url = '${URL}/provisioning/discover'
-body = {
-    "discover": {
-        "type":"openstack",
-        "keystone":"http://10.1.0.1:5000/v2.0",
-        "auth":{
-           "tenantName":"choonho.son",
-           "passwordCredentials":{
-              "username": "choonho.son",
-              "password": "123456"
-           }
-        }
-    }
-}
-discover = makePost(url, header, body)
-
-display('List Regions')
-url = '${URL}/provisioning/regions'
 show(makeGet(url, header))
 
-display('List Zones')
-url = '${URL}/provisioning/zones'
-show(makeGet(url, header))
+
+display('Add Cloud User info')
+a_url = '${URL}/users/%s/detail' % user_id
+body = {"add": {"tenantName":"${TENANT_ID}", "username":"${USER_ID2}", "password":"${PASSWORD2}"},"platform":"openstack"}
+show(makePost(a_url, header, body))
+
+display('Get Cloud User Info')
+body = {'get':user_id, 'platform':'openstack'}
+show(makePost(a_url, header, body))
 ~~~

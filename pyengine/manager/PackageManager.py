@@ -99,11 +99,14 @@ class PackageManager(Manager):
     ##############################################
     # Stack
     ##############################################
-    def deployStack(self, params):
+    def deployStack(self, params, ctx):
         """
         @params:
             - package_id
             - env
+        @ctx: context of account
+            - ctx['user_id']
+            - ctx['xtoken']
 
         """
 
@@ -133,6 +136,10 @@ class PackageManager(Manager):
         HOST_IP = '127.0.0.1'
         url = 'http://%s/api/v1/catalog/stacks/%s/env' % (HOST_IP, stack.stack_id)
         item = {'METADATA':url}
+        self.addEnv2(stack.stack_id, item)
+
+        # Update Env(token)
+        item = {'jeju':{'TOKEN':ctx['xtoken']}}
         self.addEnv2(stack.stack_id, item)
 
         if pkg_type == "bpmn":
@@ -191,7 +198,19 @@ class PackageManager(Manager):
         info = self.getEnv(stack_id)
 
         env = info.output['env']
-        env.update(params['add'])
+        self.logger.debug("Previous Env: %s" % env)
+        keys = params['add'].keys()
+        value = params['add']
+        for key in keys:
+            if env.has_key(key) == False:
+                env.update(params['add'])
+            else:
+                # Env has already key and dictionary type
+                if type(env[key]) == dict and type(value[key]) == dict:
+                    value1 = env[key]
+                    value1.update(value[key])
+                
+        self.logger.debug("Next Env: %s" % env)
 
         dic = {}
         dic['env'] = json.dumps(env)

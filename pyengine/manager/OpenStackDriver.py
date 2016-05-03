@@ -239,7 +239,27 @@ class OpenStackDriver(Manager):
             result = json.loads(r.text)
             self.logger.debug(r.text)
             server = {}
+            # Server ID
             server['server_id'] = result['server']['id']
+            # Address
+            """
+            "addresses": {
+              "subnet-choonho.son": [
+                {"OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:8a:ba:e5", 
+                "version": 4, 
+                "addr": "192.168.1.120", 
+                "OS-EXT-IPS:type": "fixed"}]
+            },
+            """
+            if result['server'].has_key('addresses'):
+                temp = result['server']['addresses']
+                for key in temp.keys():
+                    v2 = temp[key]
+                    for item in v2:
+                        addr = item['addr']
+                        # TODO: we assume VM has one IP
+                        server['private_ip_address'] = addr
+
             return server
         return {"failed":json.loads(r.text)}
 
@@ -390,6 +410,25 @@ class OpenStackDriver(Manager):
         if r.status_code == 200:
             result = json.loads(r.text)
             self.logger.debug(r.text)
-            return {'status': result['server']['status']}
+            # Address
+            """
+            "addresses": {
+              "subnet-choonho.son": [
+                {"OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:8a:ba:e5", 
+                "version": 4, 
+                "addr": "192.168.1.120", 
+                "OS-EXT-IPS:type": "fixed"}]
+            },
+            """
+            addr=""
+            if result['server'].has_key('addresses'):
+                temp = result['server']['addresses']
+                for key in temp.keys():
+                    v2 = temp[key]
+                    for item in v2:
+                        addr = item['addr']
+                        # TODO: we assume VM has one IP
+
+            return {'status': result['server']['status'], 'private_ip_address':addr}
         else:
             return {'status':'unknown'}

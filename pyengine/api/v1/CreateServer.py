@@ -18,5 +18,7 @@ class CreateServer(Command):
     def execute(self):
         mgr = self.locator.getManager('CloudManager')
 
-        info = mgr.createServer(self.params)
+        ctx = {}
+        ctx['user_id'] = self.user_meta['user_id']
+        info = mgr.createServer(self.params, ctx)
         return info.result()

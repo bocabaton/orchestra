@@ -18,6 +18,13 @@ class user(models.Model):
     group = models.ForeignKey('group', to_field='uuid', null=True, blank=True, default=None)
     created = models.DateTimeField(auto_now_add=True, editable=False)
 
+class user_detail(models.Model):
+    user = models.ForeignKey('user', to_field='user_id')
+    platform = models.CharField(max_length=20, null=True)
+    key = models.CharField(max_length=128, null=True)
+    value = models.CharField(max_length=256, null=True)
+
+
 class token(models.Model):
     user = models.ForeignKey('user', to_field='user_id')
     token = models.UUIDField(default=uuid.uuid4, unique=True)

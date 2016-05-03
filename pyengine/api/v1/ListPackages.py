@@ -5,7 +5,7 @@ class ListPackages(Command):
 
     # Request Parameter Info
     req_params = {
-        'search': ('o', 'list'),
+        'product_id': ('o', 'str'),
         'search_or': ('o', 'list'),
         'sort': ('o', 'dic'),
         'page': ('o', 'dic'),
@@ -15,9 +15,11 @@ class ListPackages(Command):
         super(self.__class__, self).__init__(api_request)
 
     def execute(self):
-        search = self.makeSearch('name', 'owner') 
+        if self.params.has_key('product_id'):
+            search = [{'key':'product', 'value':self.params['product_id'], 'option':'eq'}]
+        #search = self.makeSearch('product_id') 
         search_or = self.params.get('search_or', [])
-        sort = self.params.get('sort', {'key': 'name'})
+        sort = self.params.get('sort', {'key': 'product_id'})
         page = self.params.get('page', {})
 
         mgr = self.locator.getManager('PackageManager')

@@ -5,17 +5,16 @@ class ListProducts(Command):
 
     # Request Parameter Info
     req_params = {
-        'search': ('o', 'list'),
-        'search_or': ('o', 'list'),
-        'sort': ('o', 'dic'),
-        'page': ('o', 'dic'),
+        'name': ('o', 'str'),
+        'owner': ('o', 'str'),
+        'portfolio_id': ('o', 'str'),
     }
     
     def __init__(self, api_request):
         super(self.__class__, self).__init__(api_request)
 
     def execute(self):
-        search = self.makeSearch('name', 'owner') 
+        search = self.makeSearch('name', 'owner', 'portfolio_id') 
         search_or = self.params.get('search_or', [])
         sort = self.params.get('sort', {'key': 'name'})
         page = self.params.get('page', {})

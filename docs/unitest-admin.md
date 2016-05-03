@@ -60,6 +60,14 @@ def makeDelete(url, header):
     print r.text
     raise NameError(url)
 
+display('Auth')
+url = '${URL}/token/get'
+user_id='root'
+password='123456'
+body = {'user_id':user_id, 'password':password}
+token = makePost(url, header, body)
+token_id = token['token']
+header.update({'X-Auth-Token':token_id})
 
 url = '${URL}/catalog/portfolios'
 display('List Portfolios')
@@ -178,14 +186,29 @@ show(task)
 
 display('Map Task #2')
 task_url = '${URL}/catalog/workflows/%s/tasks' % workflow_id
+body = {'map': {'name':'Reboot VMs', 'task_type':'ssh+cluster', 'task_uri':"reboot"}}
+task = makePost(task_url, header, body)
+task_id = task['task_id']
+show(task)
+
+
+display('Map Task #3')
+task_url = '${URL}/catalog/workflows/%s/tasks' % workflow_id
 body = {'map': {'name':'Install Jeju', 'task_type':'ssh+cluster', 'task_uri':"apt-get update;apt-get -y install python-pip;pip install jeju --upgrade"}}
 task = makePost(task_url, header, body)
 task_id = task['task_id']
 show(task)
 
-display('Map Task #3')
+display('Map Task #4')
 task_url = '${URL}/catalog/workflows/%s/tasks' % workflow_id
-body = {'map': {'name':'Install Couchbase Package', 'task_type':'ssh+cluster', 'task_uri':'env > /root/test'}}
+body = {'map': {'name':'Install Couchbase Package', 'task_type':'jeju+cluster', 'task_uri':'couchbase-server1.md'}}
+task = makePost(task_url, header, body)
+task_id = task['task_id']
+show(task)
+
+display('Map Task #5')
+task_url = '${URL}/catalog/workflows/%s/tasks' % workflow_id
+body = {'map': {'name':'Config Cluster', 'task_type':'jeju+init', 'task_uri':'couchbase-server2.md'}}
 task = makePost(task_url, header, body)
 task_id = task['task_id']
 show(task)
@@ -208,53 +231,21 @@ show(makePost(task_url, header, body))
 
 
 ######################################
-# Deploy Stack
-######################################
-display('Select Zone for deploy')
-zone_url = '${URL}/provisioning/zones'
-zones = makeGet(zone_url, header)
-zone_id = zones['results'][0]['zone_id']
-show(zones)
-
-stack_url = '${URL}/catalog/stacks'
-display('Deploy Stack')
-body = {'package_id':package_id, 'env': {'jeju':{'NUM_NODES':2,'ZONE_ID':zone_id}}}
-stack = makePost(stack_url, header, body)
-stack_id = stack['stack_id']
-show(stack)
-stack_id = stack['stack_id']
-
-display('Add Stack env')
-stack_url2= '${URL}/catalog/stacks/%s/env' % stack_id
-body = {'add': {'test':'http://127.0.0.1'}}
-stack = makePost(stack_url2, header, body)
-show(stack)
-
-body = {'add': {'vm':[{'vm1':'1.2.3.4'},{'vm2':'2.2.2.2'}]}}
-stack = makePost(stack_url2, header, body)
-show(stack)
-
-display('Get Stack env')
-body = {'get':'cluster'}
-kv = makePost(stack_url2, header, body)
-show(kv)
-
-######################################
 # Recursive Delete
 ######################################
 #display('Delete Tag')
 #show(makeDelete(tag_url, header))
 
-display('Delete Package')
-show(makeDelete(package_url2, header))
+#display('Delete Package')
+#show(makeDelete(package_url2, header))
 
-display('Delete Product detail')
-show(makeDelete(detail_url, header))
+#display('Delete Product detail')
+#show(makeDelete(detail_url, header))
 
-display('Delete Product')
-show(makeDelete(product_url2, header))
+#display('Delete Product')
+#show(makeDelete(product_url2, header))
 
-display('Delete Portfolio:%s' % p_id)
-portfolio = makeDelete(url, header)
-show(portfolio)
+#display('Delete Portfolio:%s' % p_id)
+#portfolio = makeDelete(url, header)
+#show(portfolio)
 ~~~

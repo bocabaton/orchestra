@@ -16,6 +16,9 @@ class DeployStack(Command):
     def execute(self):
         mgr = self.locator.getManager('PackageManager')
 
-        info = mgr.deployStack(self.params)
+        ctx = {}
+        ctx['user_id'] = self.user_meta['user_id']
+        ctx['xtoken'] = self.xtoken
+        info = mgr.deployStack(self.params, ctx)
 
         return info.result()

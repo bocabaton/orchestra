@@ -6,7 +6,7 @@
 
 Keyword | Value     | Description
 ----    | ----      | ----
-REPO | /opt/catalog | Project name
+REPO | /opt/orchestra | Project name
 
 ## Clean up database
 

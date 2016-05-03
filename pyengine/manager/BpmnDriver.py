@@ -53,39 +53,48 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
         # TODO: find exact url
         url = 'http://127.0.0.1/api/v1/catalog/workflows/%s/tasks' % task.workflow.name
         meta_url = 'http://127.0.0.1/api/v1/catalog/stacks/%s/env' % task.workflow.stack_id
+        workflow_id = task.workflow.name
+        stack_id = task.workflow.stack_id
+        mgr = self.locator.getManager('WorkflowManager')
+        task_info = mgr.getTaskByName(workflow_id, task.get_description())
+        self.logger.debug(task_info)
+        ttype = task_info.output['task_type']
+        self.logger.debug("Task type:%s" % ttype)
+        (cmd_type, group) = self._parseTaskType(ttype)
+        if group == 'localhost' and cmd_type == 'jeju':
+            # every jeju has 'METADATA' keyword for metadata put/get
+            kv = "METADATA=%s," % meta_url
+            # Add Global Env
+            kv = self._getKV(stack_id, 'jeju', kv)
+            if kv[-1] == ",":
+                kv = kv[:-1]
+            cmd = 'jeju -m %s -k %s' % (task_info.output['task_uri'], kv)
+            LOG.debug('### cmd:%s' % cmd) 
+            os.system(cmd)
 
-        LOG.debug('### request url:%s' % url)
-        header = {'Content-Type':'application/json'}
-        body = {'get':task.get_description()}
-        r = requests.post(url, headers=header, data=json.dumps(body))
-        if r.status_code == 200:
-            task = json.loads(r.text)
-            ttype = task['task_type']
-            self.logger.debug("Task type:%s" % ttype)
-            (cmd_type, group) = self._parseTaskType(ttype)
-            if group == 'localhost' and cmd_type == 'jeju':
-                # every jeju has 'METADATA' keyword for metadata put/get
-                kv = "METADATA=%s," % meta_url 
-                kv = self._getKV(meta_url, 'jeju', kv)
-                cmd = 'jeju -m %s -k %s' % (task['task_uri'], kv)
-                LOG.debug('### cmd:%s' % cmd) 
-                os.system(cmd)
-                LOG.debug('### content:\n%s' % r.text)
-
-            else:
-                group_info = self._getKV2(meta_url, group)
-                #self.logger.debug(group_info)
-                mgr = self.locator.getManager('CloudManager')
-                for server_id in group_info:
-                    cmd = task['task_uri']
-                    params = {'server_id':server_id, 'cmd':cmd}
-                    output = mgr.executeCmd(params) 
-                    self.logger.debug('cmd output:%s' % output)
-                    #server_info = mgr.getServerInfo(server_id)
-                    #if server_info.has_key['floatingip'] == True:
-                    #    self.logger.debug("Access by floatingip (%s)" % server_info['floatingip'])
         else:
-            LOG.debug('### fail to get')
+            group_info = self._getKV2(stack_id, group)
+            mgr = self.locator.getManager('CloudManager')
+            for server_id in group_info:
+                self.logger.debug("Execute@(%s)" % server_id)
+                if cmd_type == 'jeju':
+                    kv = 'METADATA=%s,' % meta_url
+                    # Add Global Env
+                    kv = self._getKV(stack_id, 'jeju', kv)
+                    # Add Local Env
+                    kv = self._getKV(stack_id, server_id, kv)
+                    # Filter last character
+                    if kv[-1]==",":
+                        kv = kv[:-1]
+                    cmd = 'jeju -m %s -k %s 2>&1 /tmp/jeju.log' % (task_info.output['task_uri'], kv)
+                elif cmd_type == 'ssh':
+                    cmd = task_info.output['task_uri']
+                params = {'server_id':server_id, 'cmd':cmd}
+                output = mgr.executeCmd(params) 
+                self.logger.debug('cmd output:%s' % output)
+                #server_info = mgr.getServerInfo(server_id)
+                #if server_info.has_key['floatingip'] == True:
+                #    self.logger.debug("Access by floatingip (%s)" % server_info['floatingip'])
 
     def _parseTaskType(self, ttype):
         """
@@ -101,13 +110,13 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
             nodes = 'localhost'
         return (items[0] , nodes)
 
-    def _getNodeGroup(self, meta_url, group_name):
+    def _getNodeGroup(self, stack_id, group_name):
         """
         @return: list of server information for ssh connection 
                 [{'name':'xxxx','ipv4':'xxxx','floatingip':'xxxx','id':'root','pw':'123456'},
                 }
         """
-        group_list = self._getKV2(meta_url, group_name)
+        group_list = self._getKV2(stack_id, group_name)
         if group_list == None:
             # Error
             pass
@@ -118,10 +127,10 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
             infos.append(server_info)
         return infos
         
-    def _getKV(self, meta_url, key, output):
+    def _getKV(self, stack_id, key, output):
         """
         @params:
-            - meta_url: url for environment
+            - stack_id: stack_id
             - key: key for get item
             - output: return string
 
@@ -129,30 +138,22 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
         @return: string for jeju environment
          ex) "NUM_NODES=3,KV=http://1.2.3.4"
         """
-        header = {'Content-Type':'application/json'}
-        body = {'get':key}
-        r = requests.post(meta_url, headers=header, data=json.dumps(body))
-        if r.status_code == 200:
-            items = json.loads(r.text)
-            for key in items.keys():
-                value = items[key]
-                output = output + "%s=%s," % (key, value)
-        return output[:-1]
+        items = self._getKV2(stack_id, key)
+        #TODO: items are dictionary
+        for key in items.keys():
+            value = items[key]
+            output = output + "%s=%s," % (key, value)
+        return output
 
-    def _getKV2(self, meta_url, key):
+    def _getKV2(self, stack_id, key):
         """
         @params:
-            - meta_url: url for environment
+            - stack_id: stack_id
             - key: key for get item
         @ return: value
         """
-        header = {'Content-Type':'application/json'}
-        body = {'get':key}
-        r = requests.post(meta_url, headers=header, data=json.dumps(body))
-        if r.status_code == 200:
-            return json.loads(r.text)
-        return None
-
+        mgr = self.locator.getManager('PackageManager')
+        return mgr.getEnv2(stack_id, key)
 
 class ServiceTaskParser(TaskParser):
     pass
