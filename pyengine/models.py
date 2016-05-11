@@ -74,6 +74,7 @@ class stack(models.Model):
     stack_id = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
     package = models.ForeignKey('package', to_field='package_id', null=False)
     env = models.CharField(max_length=10240, null=True)
+    state = models.CharField(max_length=20, default='builing')
  
 ############
 # Workflow

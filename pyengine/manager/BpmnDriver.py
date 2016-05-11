@@ -46,6 +46,10 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
 
     def entering_ready_state(self, task):
         print "Do ready : %s" % task.get_description()
+        stack_id = task.workflow.stack_id
+        p_mgr = self.locator.getManager('PackageManager')
+        state = {'workflow_state':{task.get_description():'building'}}
+        p_mgr.addEnv2(stack_id, state)
 
     def entering_complete_state(self, task):
         LOG.debug('### workflow_id:%s' % task.workflow.name)
@@ -95,6 +99,11 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
                 #server_info = mgr.getServerInfo(server_id)
                 #if server_info.has_key['floatingip'] == True:
                 #    self.logger.debug("Access by floatingip (%s)" % server_info['floatingip'])
+        # Update State
+        state = {'workflow_state':{task.get_description():'complete'}}
+        self.logger.debug("Update State to complete:%s" % state)
+        p_mgr = self.locator.getManager('PackageManager')
+        p_mgr.addEnv2(stack_id, state)
 
     def _parseTaskType(self, ttype):
         """
@@ -261,6 +270,10 @@ class BpmnDriver(Manager):
 
         # 2. Run BPMN
         self.run_engine()
+
+        # 3. Update Stack state
+        p_mgr = self.locator.getManager('PackageManager')
+        p_mgr.updateStackState(stack_id, "running")
    
     def _loadURI(self, uri):
         """

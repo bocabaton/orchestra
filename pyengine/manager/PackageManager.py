@@ -1,10 +1,23 @@
 import json
+import threading
 
 from django.contrib.auth.hashers import make_password
 from pyengine.lib import utils
 from pyengine.lib import config
 from pyengine.lib.error import *
 from pyengine.manager import Manager 
+
+class StackThread(threading.Thread):
+    def __init__(self, driver, template, env, stack_id):
+        threading.Thread.__init__(self)
+        self.driver = driver
+        self.template = template
+        self.env = env
+        self.stack_id = stack_id
+
+    def run(self):
+        self.driver.run(self.template, self.env, self.stack_id)
+
 
 class PackageManager(Manager):
 
@@ -145,8 +158,13 @@ class PackageManager(Manager):
         if pkg_type == "bpmn":
             # BPMN Driver
             driver = self.locator.getManager('BpmnDriver')
-            driver.run(template, env, stack.stack_id)
+            thread = StackThread(driver, template, env, stack.stack_id)
+            thread.start()
+            #driver.run(template, env, stack.stack_id)
         return self.getStackByID(stack.stack_id)
+
+    def getStack(self, params):
+        return self.getStackByID(params['stack_id'])
 
     def getStackByID(self, stack_id):
         dao = self.locator.getDAO('stack')
@@ -226,4 +244,17 @@ class PackageManager(Manager):
             - item: dictionary for data
         """
         params = {'stack_id':stack_id, 'add':item}
-        return self.addEnv(params)        
+        return self.addEnv(params)
+
+    def updateStackState(self, stack_id, state):
+        """
+        @params:
+            - stack_id
+            - state : string of state
+        """
+        dic = {}
+        dic['state'] = state
+        dao = self.locator.getDAO('stack')
+        stack = dao.update(stack_id, dic, 'stack_id')
+        return self.locator.getInfo('StackInfo', stack)
+
