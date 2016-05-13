@@ -75,6 +75,7 @@ class stack(models.Model):
     package = models.ForeignKey('package', to_field='package_id', null=False)
     env = models.CharField(max_length=10240, null=True)
     state = models.CharField(max_length=20, default='builing')
+    created = models.DateTimeField(auto_now_add=True, editable=False)
  
 ############
 # Workflow

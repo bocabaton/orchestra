@@ -163,6 +163,18 @@ class PackageManager(Manager):
             #driver.run(template, env, stack.stack_id)
         return self.getStackByID(stack.stack_id)
 
+    def listStacks(self, search, search_or, sort, page):
+        dao = self.locator.getDAO('stack')
+
+        output = []
+        (stacks, total_count) = dao.select(search=search, search_or=search_or, sort=sort, page=page)
+
+        for item in stacks:
+            info = self.locator.getInfo('StackInfo', item)
+            output.append(info)
+        return (output, total_count)
+
+
     def getStack(self, params):
         return self.getStackByID(params['stack_id'])
 

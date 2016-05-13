@@ -15,3 +15,4 @@ class StackInfo(VOInfo):
         self.output['package_id'] = self.vo.package_id
         self.output['env'] = json.loads(self.vo.env)
         self.output['state'] = self.vo.state
+        self.output['created'] = self.vo.created
