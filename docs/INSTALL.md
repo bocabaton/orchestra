@@ -1,132 +1,116 @@
-# PyEngine - Installation
+# Pyengine
 
-* [CentOS](https://github.com/pyengine/pyengine/blob/master/docs/INSTALL.md#centos)
-* Ubuntu
-* Amazon Linux
+## Prerequisite
 
-## CentOS
-### 1. Install Yum Packages
+Keyword | Value     | Description
+----    | ----      | ----
+PROJECT | orchestra | Project name
+ 
+# Installation
+
+## Install libraries
+
+Pyengine is based on apache and python django framework
+
 ~~~bash
-yum install python python-pip mariadb MySQL-python httpd mod_wsgi git
+apt-get update
+apt-get install -y git python-dev python-pip mariadb-server apache2 libapache2-mod-wsgi python-mysqldb libyaml-cpp-dev libyaml-dev python-paramiko
 ~~~
 
-### 2. Install PIP Packages
+## Install BPMN library
+
+Workflow Engine is based on BPMN library
+
 ~~~bash
-pip install django django-log-request-id dicttoxml xmltodict routes rsa pytz
+git clone https://github.com/knipknap/SpiffWorkflow.git
+cd SpiffWorkflow
+python setup.py install
 ~~~
 
-### 3. MariaDB Installation (Optional)
-* Install MariaDB Package
+## Install PIP libraries for django
+
 ~~~bash
-yum install mariadb-server
+pip install django
+pip install django-log-request-id
+pip install dicttoxml
+pip install xmltodict
+pip install routes
+pip install rsa
+pip install pytz
+pip install pyyaml
 ~~~
 
-* Update Settings (/etc/my.cnf)
+## Download source
+
+Download pyengine source
+
+~~~bash
+cd /opt/
+git clone https://github.com/pyengine/orchestra.git ${PROJECT}
+~~~
+
+## Update python module path environment
+
+edit /usr/local/lib/python2.7/site-packages/pyengine.pth
+
 ~~~text
-[mysql]
-...
-default-character-set = utf8
-
-[mysqld]
-...
-init_connect="SET collation_connection=utf8_general_ci"
-init_connect="SET NAMES utf8"
-character-set-server=utf8
-collation-server=utf8_general_ci
-skip-character-set-client-handshake
-
-[client]
-...
-default-character-set = utf8
-
-[mysqldump]
-...
-default-character-set = utf8
+/opt/${PROJECT}
 ~~~
 
-* Restart MariaDB
-~~~bash
-systemctl start mariadb.service
-systemctl enable mariadb.service
-~~~
+# Update Configuration
 
-* Set Root Password & Login
-~~~bash
-mysqladmin -u root password '<password>'
-mysql -u root -p
-~~~
+## Update Apache configuration
 
-* Create Database & User
-~~~mysql
-create database pyengine;
-grant all privileges on pyengine.* to pyengine@'%' identified by '<password>' with grant option;
-grant all privileges on pyengine.* to pyengine@'localhost' identified by '<password>' with grant option;
-~~~
+edit /etc/apache2/conf-available/pyengine.conf
 
-### 4. Download PyEngine Source
-~~~bash
-git clone https://github.com/pyengine/pyengine.git identity
-~~~
-
-## 5. Change Log Permissions
-~~~bash
-mkdir -p /var/log/pyengine
-chown -R apache:apache /var/log/pyengine
-~~~
-
-## 6. Update Pyengine Settings
 ~~~text
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'pyengine',
-        'USER': 'pyengine',
-        'PASSWORD': '<password>',
-        'HOST': 'localhost',
-    }
-}
+<VirtualHost *:80>
+    Alias /static    /opt/${PROJECT}/static
+    <Directory /opt/${PROJECT}/static>
+        Require all granted
+    </Directory>
 
-LOGGING = {
-            ...
-            'filename' : '/var/log/pyengine/pyengine.log',
-            ...
-}
+    WSGIScriptAlias / /opt/${PROJECT}/pyengine/wsgi.py
+    WSGIPassAuthorization On
+
+    <Directory /opt/${PROJECT}/pyengine>
+    <Files wsgi.py>
+        Require all granted
+    </Files>
+    </Directory>
+
+    AddDefaultCharset UTF-8
+</VirtualHost>
 ~~~
 
-## 7. DB Sync
+Enable the pyengine
+
 ~~~bash
-cd /opt/pyengine
+a2enconf pyengine
+~~~
+
+# Create Database
+
+Create pyengine database
+
+~~~bash
+mysql -u root -e "create database pyengine character set utf8 collate utf8_general_ci"
+~~~
+
+## Update django DB
+
+~~~bash
+mkdir /var/log/pyengine
+chown -R www-data:www-data /var/log/pyengine
+
+cd /opt/${PROJECT}
 python manage.py makemigrations
 python manage.py migrate
 ~~~
 
-## 8. Create Root User
+# Restart Apache
+
 ~~~bash
-cd /opt/pyengine/bin
-python create_root.py <root_password>
-~~~
-
-## 9. Set Apache Configuration (/etc/httpd/conf.d/pyengine.conf)
-~~~text
-<VirtualHost *:80>
-        Alias /pyengine/static/ /opt/pyengine/static/
-        <Directory /opt/pyengine/static>
-            Require all granted
-        </Directory>
-
-        WSGIScriptAlias /pyengine /opt/pyengine/pyengine/wsgi.py
-        <Directory /opt/pengine/pyengine>
-        <Files wsgi.py>
-            Require all granted
-        </Files>
-        </Directory>
-
-        AddDefaultCharset UTF-8
-</VirtualHost>
-~~~
-
-## 10. Start Apache Daemon
-~~~bash
-systemctl restart httpd.service
-systemctl enable httpd.service
+rm /var/log/pyengine/api.log
+service apache2 restart
 ~~~
