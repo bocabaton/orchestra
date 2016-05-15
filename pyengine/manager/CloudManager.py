@@ -2,6 +2,7 @@ import json
 import paramiko
 import socket
 import time
+import StringIO
 
 from paramiko.ssh_exception import *
 
@@ -219,8 +220,21 @@ class CloudManager(Manager):
             driver = self.locator.getManager('OpenStackDriver')
             (output, total_count) = driver.discover(value)
             return (output, total_count)
-       
-        # TODO: AWS Driver, Joyent Driver
+
+        """
+        {"discover": {
+            "type":"aws",
+            "auth":{
+               "access_key_id":"aws access key id",
+               "secret_access_key":"aws secret access key"
+            }
+        }
+        """
+        if value['type'] == 'aws':
+            driver = self.locator.getManager('AwsDriver')
+            (output, total_count) = driver.discover(value)
+            return (output, total_count)
+        # TODO: GCE Driver, Joyent Driver
 
 
     ###############################################
@@ -232,6 +246,7 @@ class CloudManager(Manager):
             {"zone_id":"xxxx-xxx-xxxxx-xxxxx",
              "name":"vm1",
              "floatingIP":True,
+             "key_name":"my_keypair_name",
              "request":{
                 "server":{
                    "name":"vm1",
@@ -259,11 +274,9 @@ class CloudManager(Manager):
         server = dao.insert(dic)
 
         # 1. Detect Driver
-        #driver = self._getDriver(params['zone_id'])
-        driver = self.locator.getManager('OpenStackDriver')
+        (driver, platform) = self._getDriver(params['zone_id'])
         # 2. Call deploy
         usr_mgr = self.locator.getManager('UserManager')
-        platform = 'openstack'
         auth_params = {'get':ctx['user_id'], 'platform':platform}
         self.logger.debug("auth:%s" % auth_params)
         auth = usr_mgr.getUserInfo(auth_params)
@@ -286,18 +299,20 @@ class CloudManager(Manager):
         # Update server_info
         # ex) server_id from nova
         # Check Server Status
-        for i in range(10):
-            status = driver.getServerStatus(auth, zone_id, created_server['server_id'])
-            if status.has_key('status'):
-                if status['status'] == 'ACTIVE':
-                    # Can find private address
-                    self.updateServerInfo(server.server_id, "private_ip_address", status['private_ip_address'])
-                    break
+        if params.has_key('floatingIP') == True:
+            for i in range(10):
+                status = driver.getServerStatus(auth, zone_id, created_server['server_id'])
+                if status.has_key('status'):
+                    self.logger.debug("Server Status:%s" % status['status'])
+                    if status['status'] == 'ACTIVE' or status['status'] == 'running':
+                        # Can find private address
+                        self.updateServerInfo(server.server_id, "private_ip_address", status['private_ip_address'])
+                        break
+                    else:
+                        self.logger.info('Wait to active:%s' % status['status'])
+                        time.sleep(3)
                 else:
-                    self.logger.info('Wait to active:%s' % status['status'])
-                    time.sleep(3)
-            else:
-                self.logger.info('Status not found')
+                    self.logger.info('Status not found')
 
         # 3. Floating IP
         if params.has_key('floatingIP') == True:
@@ -307,11 +322,28 @@ class CloudManager(Manager):
                 self.updateServerInfo(server.server_id, 'floatingip', address)
         else:
             self.logger.debug("No Floating IP")
-        #########
-        # TEMP
-        #########
-        self.updateServerInfo(server.server_id,'user_id','root')
-        self.updateServerInfo(server.server_id,'password','123456')
+        #######################
+        # Update Keypair
+        #######################
+        if params.has_key('key_name') == True:
+            # get value of keypair
+            req = {'user_id':ctx['user_id'], 'get':params['key_name']}
+            k_info = usr_mgr.getUserKeypair(req)
+            if platform == "aws":
+                key_user_id = "ec2-user"
+            elif platform == "openstack":
+                key_user_id = "root"
+            else:
+                key_user_id = "root"
+            #TODO: GCE
+            self.updateServerInfo(server.server_id, 'user_id', key_user_id)
+            self.updateServerInfo(server.server_id, 'key_type', k_info['key_type'])
+            self.updateServerInfo(server.server_id, k_info['key_type'] , k_info['value'])
+
+        else:
+            # TODO: Temporary(Remove)           
+            self.updateServerInfo(server.server_id,'user_id','root')
+            self.updateServerInfo(server.server_id,'password','123456')
 
         return self.locator.getInfo('ServerInfo', server)
 
@@ -380,6 +412,7 @@ class CloudManager(Manager):
             port = params['port']
         else:
             port = 22
+        # User ID
         if params.has_key('user_id') == True:
             user_id = params['user_id']
         else:
@@ -387,17 +420,33 @@ class CloudManager(Manager):
                 user_id = server_info['user_id']
             else:
                 raise ERROR_NOT_FOUND(key='user_id', value='no user_id')
+        # Password
+        auth_type = "password"
         if params.has_key('password') == True:
             password = params['password']
+        elif params.has_key('id_rsa') == True:
+            auth_type = 'id_rsa'
+            id_rsa = params['id_rsa']
+        elif params.has_key('id_dsa') == True:
+            auth_type = 'id_dsa'
+            id_dsa = params['id_dsa']
         else:
-            if server_info.has_key('password') == True:
-                password = server_info['password']
-                AUTH='password'
-                
+            # Find from server_info
+            if server_info.has_key('key_type') == True:
+                auth_type = server_info['key_type']
+                if auth_type == 'password':
+                    password = server_info['password']
+                elif auth_type == 'id_rsa':
+                    id_rsa = server_info['id_rsa']
+                elif auth_type == 'id_dsa':
+                    id_dsa = server_info['id_dsa']
+ 
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         connected = False
-        if AUTH=='password':
+        self.logger.debug("Auth Type:%s" % auth_type)
+        self.logger.debug("User ID:%s" % user_id)
+        if auth_type=='password':
             self.logger.debug("Password:%s" % password)
             time.sleep(10)
             try:
@@ -412,14 +461,57 @@ class CloudManager(Manager):
             except socket.error as e:
                 err_msg = "socket error"
 
-        if connected == False and params.has_key('id_rsa'):
-            pass
+        elif auth_type == 'id_rsa':
+            # Connect by id_rsa
+            try:
+                pkey = paramiko.RSAKey.from_private_key(StringIO.StringIO(id_rsa))
+                ssh.connect(ip, port, user_id, pkey=pkey)
+                connected = True
+            except BadHostKeyException as e:
+                err_msg = "Bad Host Key Exception"
+            except AuthenticationException as e:
+                err_msg = "Authentication Exception"
+            except SSHException as e:
+                err_msg = "SSH Exception"
+            except socket.error as e:
+                err_msg = "socket error"
+                self.logger.debug(e)
 
-        if connected == False and params.has_key('id_dsa'):
-            pass
+        elif auth_type == 'id_dsa':
+            # Connect by id_dsa
+            try:
+                pkey = paramiko.DSSKey.from_private_key(StringIO.StringIO(id_dsa))
+                ssh.connect(ip, port, user_id, pkey=pkey)
+                connected = True
+            except BadHostKeyException as e:
+                err_msg = "Bad Host Key Exception"
+            except AuthenticationException as e:
+                err_msg = "Authentication Exception"
+            except SSHException as e:
+                err_msg = "SSH Exception"
+            except socket.error as e:
+                err_msg = "socket error"
+
 
         if connected == False:
+            self.logger.debug(err_msg)
             return (False, "Can not connect")
 
         return (True, ssh)
 
+    def _getDriver(self, zone_id):
+        """
+        @params
+            - zone_id: zone ID
+        @return
+            - driver instance of cloud (ex OpenStackDriver, AwsDriver)
+            - platform name
+        """
+        driver_dic = {'openstack':'OpenStackDriver',
+                'aws':'AwsDriver',
+            }
+        param = {'zone_id':zone_id}
+        zone_info = self.getZone(param)
+        zone_type = zone_info.output['zone_type']
+
+        return (self.locator.getManager(driver_dic[zone_type]), zone_type)

@@ -24,6 +24,12 @@ class user_detail(models.Model):
     key = models.CharField(max_length=128, null=True)
     value = models.CharField(max_length=256, null=True)
 
+class user_keypair(models.Model):
+    user = models.ForeignKey('user', to_field='user_id')
+    key_type = models.CharField(max_length=16, null=False)
+    name = models.CharField(max_length=32, null=False, unique=True)
+    value = models.CharField(max_length=2048, null=False, editable=False)
+
 
 class token(models.Model):
     user = models.ForeignKey('user', to_field='user_id')
@@ -118,6 +124,6 @@ class server(models.Model):
 class server_info(models.Model):
     server = models.ForeignKey('server', to_field='server_id', null=False)
     key = models.CharField(max_length=128, null=True)
-    value = models.CharField(max_length=256, null=True)
+    value = models.CharField(max_length=2500, null=True)
 
 

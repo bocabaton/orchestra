@@ -208,4 +208,61 @@ class UserManager(Manager):
                     'password':output['password']
                 }
             }
+        elif params['platform'] == 'aws':
+            result['auth'] = {
+                'access_key_id':output['access_key_id'],
+                'secret_access_key':output['secret_access_key']
+                }
         return result
+
+    ############################
+    # Keypair
+    ############################
+    def addUserKeypair(self, params):
+        # TODO: encrypt password
+        # TODO: Other user can not add user info
+        user_dao = self.locator.getDAO('user')
+        dao = self.locator.getDAO('user_keypair')
+        users = user_dao.getVOfromKey(user_id=params['user_id'])
+
+        if users.count() == 0:
+            raise ERROR_NOT_FOUND(key='user_id', value=params['user_id'])
+        item = params['add']
+        if item.has_key('name') == False:
+            raise ERROR_REQUIRED_PARAM(key='add.name')
+        if item.has_key('key_type') == False:
+            raise ERROR_REQUIRED_PARAM(key='add.key_type')
+        if item.has_key('value') == False:
+            raise ERROR_REQUIRED_PARAM(key='add.value')
+
+        dic = {}
+        dic['user'] = users[0]
+        dic['name'] = item['name']
+        dic['key_type'] = item['key_type']
+        dic['value'] = item['value']
+        info = dao.insert(dic)
+        return {}
+
+    def getUserKeypair(self, params):
+        dao = self.locator.getDAO('user_keypair')
+
+        user_dao = self.locator.getDAO('user')
+        users = user_dao.getVOfromKey(user_id=params['user_id'])
+
+        if users.count() == 0:
+            raise ERROR_NOT_FOUND(key='user_id', value=params['user_id'])
+
+        search = [{'key':'name','value':params['get'],'option':'eq'}]
+        self.logger.debug("search:%s" % search)
+        search_or = []
+        sort = {}
+        page = {}
+        (items, total_count) = dao.select(search=search, search_or=search_or, sort=sort, page=page)
+        if total_count == 0:
+            raise ERROR_NOT_FOUND(key='name', value=params['get'])
+        item = items[0]
+        output = {}
+        output['name'] = item.name
+        output['key_type'] = item.key_type
+        output['value'] = item.value
+        return output

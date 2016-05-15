@@ -8,6 +8,7 @@ class CreateServer(Command):
     req_params = {
         'name': ('r', 'str'),
         'zone_id': ('r', 'str'),
+        'key_name': ('o', 'str'),
         'floatingIP': ('o', 'bool'),
         'request': ('r', 'dic'),
     }
