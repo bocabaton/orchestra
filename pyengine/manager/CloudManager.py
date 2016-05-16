@@ -256,6 +256,15 @@ class CloudManager(Manager):
               }
             }
 
+            # For baremetal
+            {"zone_id":"xxxx-xxx-xxxxx-xxxxx",
+             "name":"server01",
+             "floatingIP":False,
+             "key_name":"my_keypair_name",
+             "request": {
+                "private_ip_address":"192.168.1.1",
+             }
+            }
         @ctx: context
             ctx['user_id']
 
@@ -299,7 +308,7 @@ class CloudManager(Manager):
         # Update server_info
         # ex) server_id from nova
         # Check Server Status
-        if params.has_key('floatingIP') == True:
+        if params.has_key('floatingIP') == True and params['floatingIP'] == True:
             for i in range(10):
                 status = driver.getServerStatus(auth, zone_id, created_server['server_id'])
                 if status.has_key('status'):
@@ -509,6 +518,7 @@ class CloudManager(Manager):
         """
         driver_dic = {'openstack':'OpenStackDriver',
                 'aws':'AwsDriver',
+                'bare-metal':'BaremetalDriver',
             }
         param = {'zone_id':zone_id}
         zone_info = self.getZone(param)
