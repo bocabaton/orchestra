@@ -7,9 +7,10 @@ Keyword | Value | Description
 URL     | http://127.0.0.1/api/v1 | URL for request
 USER_ID     | sunshout | user_id for this system
 PASSWORD     | 123456 | password for this system
-TENANT_ID   | choonho.son | OpenStack tenant ID
-USER_ID2    | choonho.son | OpenStack User ID
-PASSWORD2   | 123456        | OpenStack Password
+OPENSTACK | True | If you don't want to test OpenStack, change to False
+AWS | True | If you don't want to test AWS, change to False
+KEYPAIR | True | If you don't want to register keypair change to False
+
 # Reqeust token
 
 ~~~python
@@ -78,10 +79,29 @@ show(makeGet(url, header))
 
 display('Add Cloud User info')
 a_url = '${URL}/users/%s/detail' % user_id
-body = {"add": {"tenantName":"${TENANT_ID}", "username":"${USER_ID2}", "password":"${PASSWORD2}"},"platform":"openstack"}
-show(makePost(a_url, header, body))
 
-display('Get Cloud User Info')
-body = {'get':user_id, 'platform':'openstack'}
-show(makePost(a_url, header, body))
+if ${OPENSTACK}:
+    display('Add OpenStack Cloud User info')
+    tenant_name = raw_input('Tenant Name: ')
+    username = raw_input('User ID: ')
+    password = raw_input('Password: ')
+    body = {"add": {"tenantName":tenant_name, "username":username, "password":password},"platform":"openstack"}
+    show(makePost(a_url, header, body))
+
+
+if ${AWS}:
+    display('Add AWS Cloud User info')
+    a_key = raw_input('AWS Access Key ID: ')
+    sa_key = raw_input('AWS Secret Access Key: ')
+    body = {'add':{'access_key_id':a_key, 'secret_access_key':sa_key},'platform':'aws'}
+    show(makePost(a_url, header, body))
+
+if ${KEYPAIR}:
+    display('Add Keypair to User info')
+    key_path = raw_input('Key pair file path:')
+    fp = open(key_path, 'r')
+    k_url = '${URL}/users/%s/keypair' % user_id
+    key_name = raw_input('keypair name:')
+    body = {'add':{'name':key_name, 'key_type':'id_rsa', 'value':fp.read()}}
+    show(makePost(k_url, header, body))
 ~~~

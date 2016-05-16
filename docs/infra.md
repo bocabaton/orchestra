@@ -5,6 +5,10 @@
 Keyword | Value | Description
 ----    | ----  | ----
 URL     | http://127.0.0.1/api/v1 | URL for request
+USER_ID     | root | user_id for this system
+PASSWORD     | 123456 | password for this system
+OPENSTACK | True | If you don't want to test OpenStack, change to False
+AWS | True | If you don't want to test AWS, change to False
 
 # Region/Zone
 
@@ -64,8 +68,8 @@ def makeDelete(url, header):
 
 display('Auth')
 url = '${URL}/token/get'
-user_id='root'
-password='123456'
+user_id='${USER_ID}'
+password='${PASSWORD}'
 body = {'user_id':user_id, 'password':password}
 token = makePost(url, header, body)
 token_id = token['token']
@@ -74,20 +78,46 @@ header.update({'X-Auth-Token':token_id})
 
 display('Discovery Zone')
 url = '${URL}/provisioning/discover'
-body = {
-    "discover": {
-        "type":"openstack",
-        "keystone":"http://10.1.0.1:5000/v2.0",
-        "auth":{
-           "tenantName":"choonho.son",
-           "passwordCredentials":{
-              "username": "choonho.son",
-              "password": "123456"
-           }
+
+if ${OPENSTACK}:
+    display('Discover OpenStack Cloud Infra')
+    keystone = raw_input('Keystone url(ex. http://10.1.0.1:5000/v2.0): ')
+    tenant_name = raw_input('Tenant Name: ')
+    username = raw_input('User ID: ')
+    password = raw_input('Password: ')
+ 
+    body = {
+        "discover": {
+            "type":"openstack",
+            "keystone":keystone,
+            "auth":{
+               "tenantName": tenant_name,
+               "passwordCredentials":{
+                  "username": username,
+                  "password": password
+               }
+            }
         }
     }
-}
-discover = makePost(url, header, body)
+
+    discover = makePost(url, header, body)
+
+if ${AWS}:
+    display('Add AWS Cloud User info')
+    a_key = raw_input('AWS Access Key ID: ')
+    sa_key = raw_input('AWS Secret Access Key: ')
+ 
+    body = {
+        "discover": {
+            "type":"aws",
+            "auth":{
+               "access_key_id": a_key,
+               "secret_access_key": sa_key
+            }
+        }
+    }
+
+    discover = makePost(url, header, body)
 
 display('List Regions')
 url = '${URL}/provisioning/regions'

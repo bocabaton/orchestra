@@ -38,6 +38,7 @@ pip install routes
 pip install rsa
 pip install pytz
 pip install pyyaml
+pip install boto3
 ~~~
 
 ## Download source
