@@ -428,8 +428,16 @@ class CloudManager(Manager):
     def _makeSSHClient(self, params):
         # extract information for ssh
         server_info = self.getServerInfo(params['server_id'])
-        ip = server_info['floatingip']
-       
+        
+        if server_info.has_key('floatingip'):
+            ip = server_info['floatingip']
+        elif server_info.has_key('private_ip_address'):
+            ip = server_info['private_ip_address']
+        else:
+            self.logger.info("Can not find IP: %s" % server_info)
+
+        self.logger.debug("SSH IP : %s" % ip)
+
         if params.has_key('port') == True:
             port = params['port']
         else:
