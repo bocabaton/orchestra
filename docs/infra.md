@@ -9,6 +9,7 @@ USER_ID     | root | user_id for this system
 PASSWORD     | 123456 | password for this system
 OPENSTACK | True | If you don't want to test OpenStack, change to False
 AWS | True | If you don't want to test AWS, change to False
+BAREMETAL   | True  | Register Baremetal Region, Zone
 
 # Region/Zone
 
@@ -118,6 +119,21 @@ if ${AWS}:
     }
 
     discover = makePost(url, header, body)
+
+if ${BAREMETAL}:
+    display('Add Baremetal Region & Zone')
+    region_name = raw_input('region name: ')
+    body = {'name':region_name}
+    r_url = '${URL}/provisioning/regions'
+    region = makePost(r_url, header, body)
+    show(region)
+    region_id = region['region_id']
+
+    zone_name = raw_input('Zone name: ')
+    body = {'name':zone_name, 'region_id':region_id, 'zone_type':'baremetal'}
+    z_url = '${URL}/provisioning/zones'
+    zone = makePost(z_url, header, body)
+    show(zone)
 
 display('List Regions')
 url = '${URL}/provisioning/regions'
