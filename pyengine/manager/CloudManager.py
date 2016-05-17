@@ -415,7 +415,14 @@ class CloudManager(Manager):
     def executeCmd(self, params):
 
         # Connect to Node using ssh (ip, user_id, password )
-        (tf, ssh) = self._makeSSHClient(params)
+        TRY_COUNT=5
+        for i in range(TRY_COUNT):
+            (tf, ssh) = self._makeSSHClient(params)
+            if tf == True:
+                break
+            self.logger.info("Failed to connect, try again(%s)" % i+1)
+            time.sleep(30)
+
         if tf == False:
             return {"error": ssh}
 
@@ -484,12 +491,16 @@ class CloudManager(Manager):
                 connected = True
             except BadHostKeyException as e:
                 err_msg = "Bad Host Key Exception"
+                connected = False
             except AuthenticationException as e:
                 err_msg = "Authentication Exception"
+                connected = False
             except SSHException as e:
                 err_msg = "SSH Exception"
+                connected = False
             except socket.error as e:
                 err_msg = "socket error"
+                connected = False
 
         elif auth_type == 'id_rsa':
             # Connect by id_rsa
@@ -499,12 +510,16 @@ class CloudManager(Manager):
                 connected = True
             except BadHostKeyException as e:
                 err_msg = "Bad Host Key Exception"
+                connected = False
             except AuthenticationException as e:
                 err_msg = "Authentication Exception"
+                connected = False
             except SSHException as e:
                 err_msg = "SSH Exception"
+                connected = False
             except socket.error as e:
                 err_msg = "socket error"
+                connected = False
                 self.logger.debug(e)
 
         elif auth_type == 'id_dsa':
@@ -515,13 +530,16 @@ class CloudManager(Manager):
                 connected = True
             except BadHostKeyException as e:
                 err_msg = "Bad Host Key Exception"
+                connected = False
             except AuthenticationException as e:
                 err_msg = "Authentication Exception"
+                connected = False
             except SSHException as e:
                 err_msg = "SSH Exception"
+                connected = False
             except socket.error as e:
                 err_msg = "socket error"
-
+                connected = False
 
         if connected == False:
             self.logger.debug(err_msg)
