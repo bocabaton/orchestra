@@ -45,20 +45,26 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
         return False
 
     def entering_ready_state(self, task):
-        print "Do ready : %s" % task.get_description()
+        self.logger.debug("###### enter ready : %s" % task.get_description())
         stack_id = task.workflow.stack_id
         p_mgr = self.locator.getManager('PackageManager')
-        state = {'workflow_state':{task.get_description():'building'}}
+        state = {'workflow_state':{task.get_description():'ready'}}
         p_mgr.addEnv2(stack_id, state)
 
     def entering_complete_state(self, task):
-        LOG.debug('### workflow_id:%s' % task.workflow.name)
-        LOG.debug('### stack_id:%s' % task.workflow.stack_id)
+        self.logger.debug("###### enter complete : %s" % task.get_description())
+
         # TODO: find exact url
         url = 'http://127.0.0.1/api/v1/catalog/workflows/%s/tasks' % task.workflow.name
         meta_url = 'http://127.0.0.1/api/v1/catalog/stacks/%s/env' % task.workflow.stack_id
         workflow_id = task.workflow.name
         stack_id = task.workflow.stack_id
+
+        # Change state (ready -> running)
+        p_mgr = self.locator.getManager('PackageManager')
+        state = {'workflow_state':{task.get_description():'running'}}
+        p_mgr.addEnv2(stack_id, state)
+
         mgr = self.locator.getManager('WorkflowManager')
         task_info = mgr.getTaskByName(workflow_id, task.get_description())
         self.logger.debug(task_info)
@@ -73,36 +79,38 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
             if kv[-1] == ",":
                 kv = kv[:-1]
             cmd = 'jeju -m %s -k %s' % (task_info.output['task_uri'], kv)
-            LOG.debug('### cmd:%s' % cmd) 
+            self.logger.debug('[%s] cmd: %s' % (group, cmd)) 
             os.system(cmd)
 
         else:
-            group_info = self._getKV2(stack_id, group)
-            mgr = self.locator.getManager('CloudManager')
-            for server_id in group_info:
-                self.logger.debug("Execute@(%s)" % server_id)
-                if cmd_type == 'jeju':
-                    kv = 'METADATA=%s,' % meta_url
-                    # Add Global Env
-                    kv = self._getKV(stack_id, 'jeju', kv)
-                    # Add Local Env
-                    kv = self._getKV(stack_id, server_id, kv)
-                    # Filter last character
-                    if kv[-1]==",":
-                        kv = kv[:-1]
-                    cmd = 'jeju -m %s -k %s 2>&1 /tmp/jeju.log' % (task_info.output['task_uri'], kv)
-                elif cmd_type == 'ssh':
-                    cmd = task_info.output['task_uri']
-                params = {'server_id':server_id, 'cmd':cmd}
-                output = mgr.executeCmd(params) 
-                self.logger.debug('cmd output:%s' % output)
-                #server_info = mgr.getServerInfo(server_id)
-                #if server_info.has_key['floatingip'] == True:
-                #    self.logger.debug("Access by floatingip (%s)" % server_info['floatingip'])
-        # Update State
+            # group is list
+            for each_group in group:
+                group_info = self._getKV2(stack_id, each_group)
+                mgr = self.locator.getManager('CloudManager')
+                for server_id in group_info:
+                    self.logger.debug("Execute@(%s)" % server_id)
+                    if cmd_type == 'jeju':
+                        kv = 'METADATA=%s,' % meta_url
+                        # Add Global Env
+                        kv = self._getKV(stack_id, 'jeju', kv)
+                        # Add Local Env
+                        kv = self._getKV(stack_id, server_id, kv)
+                        # Filter last character
+                        if kv[-1]==",":
+                            kv = kv[:-1]
+                        cmd = 'jeju -m %s -k %s 2>&1 /tmp/jeju.log' % (task_info.output['task_uri'], kv)
+                    elif cmd_type == 'ssh':
+                        cmd = task_info.output['task_uri']
+
+                    # servers/{server_id}/cmd API
+                    params = {'server_id':server_id, 'cmd':cmd}
+                    self.logger.debug('[%s] cmd: %s' % (server_id, cmd))
+                    output = mgr.executeCmd(params) 
+                    self.logger.debug('cmd output:%s' % output)
+
+        # Change State (running->complte)
         state = {'workflow_state':{task.get_description():'complete'}}
         self.logger.debug("Update State to complete:%s" % state)
-        p_mgr = self.locator.getManager('PackageManager')
         p_mgr.addEnv2(stack_id, state)
 
     def _parseTaskType(self, ttype):
@@ -110,14 +118,16 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
         @params:
             - ttask: task type string (cmd type + node group)
                 ex) jeju, jeju+cluster, ssh+node1 ...
+                ex) jeju+cluster1,cluster2
         @return: (cmd type, node group)
         """
         items = ttype.split("+")
-        if len(items) == 2:
-            nodes = items[1]
+        if len(items) >= 2:
+            glist = items[1].split(",")
+            return(items[0], glist)
         else:
             nodes = 'localhost'
-        return (items[0] , nodes)
+            return (items[0] , nodes)
 
     def _getNodeGroup(self, stack_id, group_name):
         """
