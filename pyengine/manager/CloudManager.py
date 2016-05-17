@@ -395,6 +395,19 @@ class CloudManager(Manager):
                 return {key: items[key]}
         return {}
 
+    def listServers(self, search):
+        server_dao = self.locator.getDAO('server')
+
+        output = []
+        (servers, total_count) = server_dao.select(search=search)
+
+        for server in servers:
+            server_info = self.locator.getInfo('ServerInfo', server)
+            output.append(server_info)
+
+        return (output, total_count)
+
+
     #####################################
     # SSH executor
     #####################################
