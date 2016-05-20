@@ -32,6 +32,7 @@ python setup.py install
 ~~~bash
 pip install django
 pip install django-log-request-id
+pip install django-cors-headers
 pip install dicttoxml
 pip install xmltodict
 pip install routes
