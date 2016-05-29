@@ -14,6 +14,6 @@ class GetRegion(Command):
     def execute(self):
         mgr = self.locator.getManager('CloudManager')
 
-        info = user_mgr.getRegion(self.params)
+        info = mgr.getRegion(self.params)
 
         return info.result()

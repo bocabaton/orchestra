@@ -67,17 +67,20 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
 
         mgr = self.locator.getManager('WorkflowManager')
         task_info = mgr.getTaskByName(workflow_id, task.get_description())
-        self.logger.debug(task_info)
+        self.logger.debug(task_info.output['task_uri'])
         ttype = task_info.output['task_type']
         self.logger.debug("Task type:%s" % ttype)
         (cmd_type, group) = self._parseTaskType(ttype)
         if group == 'localhost' and cmd_type == 'jeju':
             # every jeju has 'METADATA' keyword for metadata put/get
             kv = "METADATA=%s," % meta_url
+            self.logger.debug(stack_id)
             # Add Global Env
             kv = self._getKV(stack_id, 'jeju', kv)
+            self.logger.debug(kv)
             if kv[-1] == ",":
                 kv = kv[:-1]
+            self.logger.debug(kv)
             cmd = 'jeju -m %s -k %s' % (task_info.output['task_uri'], kv)
             self.logger.debug('[%s] cmd: %s' % (group, cmd)) 
             os.system(cmd)
@@ -158,10 +161,17 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
          ex) "NUM_NODES=3,KV=http://1.2.3.4"
         """
         items = self._getKV2(stack_id, key)
+        self.logger.debug(items)
+        self.logger.debug(output)
+        self.logger.debug(type(items))
+        self.logger.debug(items.keys())
         #TODO: items are dictionary
         for key in items.keys():
+            self.logger.debug(key)
+            self.logger.debug(items[key])
             value = items[key]
             output = output + "%s=%s," % (key, value)
+        self.logger.debug(output)
         return output
 
     def _getKV2(self, stack_id, key):

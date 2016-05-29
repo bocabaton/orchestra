@@ -196,7 +196,6 @@ class PackageManager(Manager):
         dao = self.locator.getDAO('stack')
 
         stacks = dao.getVOfromKey(stack_id=stack_id)
-
         if stacks.count() == 0:
             raise ERROR_NOT_FOUND(key='stack_id', value=stack_id)
 

@@ -14,6 +14,6 @@ class GetZone(Command):
     def execute(self):
         mgr = self.locator.getManager('CloudManager')
 
-        info = user_mgr.getZone(self.params)
+        info = mgr.getZone(self.params)
 
         return info.result()

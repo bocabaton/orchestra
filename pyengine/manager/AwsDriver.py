@@ -148,9 +148,12 @@ class AwsDriver(Manager):
         # 2. Create ec2 session
         session = Session(aws_access_key_id=a_key, aws_secret_access_key=sa_key, region_name=r_name)
         ec2 = session.resource('ec2')
+
         # 3. Create Server
-        
-        #instances = globals()['ec2.create_instances'](**req)
+        # Add placement based on zone_name
+        placement = {'Placement':{'AvailabilityZone':z_name}}
+        req.update(placement)
+        self.logger.debug(req)
         instances = ec2.create_instances(**req)
         # We support only one instance
         instance = instances[0]
@@ -293,8 +296,9 @@ class AwsDriver(Manager):
         ec2 = session.resource('ec2')
 
         # 3. Get Show server details
-        for i in range(10):
+        for i in range(50):
             instances = ec2.instances.filter(Filters=[{'Name':'instance-id','Values':[server_id]}])
+            self.logger.debug("[count: %d] get server detail" % i)
             i_json = {}
             for instance in instances:
                 i_json = {
@@ -338,4 +342,4 @@ class AwsDriver(Manager):
                     return i_json['public_ip_address']
 
             self.logger.info("Instance is not ready")
-            time.sleep(5)
+            time.sleep(10)
