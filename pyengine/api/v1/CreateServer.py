@@ -9,6 +9,7 @@ class CreateServer(Command):
         'name': ('r', 'str'),
         'zone_id': ('r', 'str'),
         'key_name': ('o', 'str'),
+        'login_id': ('o', 'str'),
         'floatingIP': ('o', 'bool'),
         'request': ('r', 'dic'),
     }

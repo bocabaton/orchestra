@@ -344,6 +344,10 @@ class CloudManager(Manager):
                 key_user_id = "root"
             else:
                 key_user_id = "root"
+
+            if params.has_key('login_id') == True:
+                key_user_id = params['login_id']
+
             #TODO: GCE
             self.updateServerInfo(server.server_id, 'user_id', key_user_id)
             self.updateServerInfo(server.server_id, 'key_type', k_info['key_type'])
