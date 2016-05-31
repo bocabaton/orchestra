@@ -197,6 +197,7 @@ class AwsDriver(Manager):
         server = {}
         server['server_id'] = instance_info['instance_id']
         #server['private_ip_address'] = instance_info['private_ip_address']
+        self.logger.debug("Create Server => private IP:%s" % instance_info['private_ip_address'])
         return server
 
     def getServerStatus(self, auth, zone_id, server_id):
@@ -267,6 +268,7 @@ class AwsDriver(Manager):
                 "virtualization_type": instance.virtualization_type,
                 "vpc_id": instance.vpc_id,
             }
+            self.logger.debug("Get Server Status => private IP:%s" % i_json['private_ip_address'])
             return {'status': i_json['state']['Name'], 'private_ip_address':i_json['private_ip_address']}  
         return {'status':'unknown'}
 

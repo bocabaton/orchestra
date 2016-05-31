@@ -81,7 +81,7 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
             if kv[-1] == ",":
                 kv = kv[:-1]
             self.logger.debug(kv)
-            cmd = 'jeju -m %s -k %s' % (task_info.output['task_uri'], kv)
+            cmd = '/usr/local/bin/jeju -m %s -k %s' % (task_info.output['task_uri'], kv)
             self.logger.debug('[%s] cmd: %s' % (group, cmd)) 
             os.system(cmd)
 
@@ -101,7 +101,7 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
                         # Filter last character
                         if kv[-1]==",":
                             kv = kv[:-1]
-                        cmd = 'jeju -m %s -k %s 2>&1 /tmp/jeju.log' % (task_info.output['task_uri'], kv)
+                        cmd = '/usr/local/bin/jeju -m %s -k %s' % (task_info.output['task_uri'], kv)
                     elif cmd_type == 'ssh':
                         cmd = task_info.output['task_uri']
 

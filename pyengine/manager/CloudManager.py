@@ -319,7 +319,7 @@ class CloudManager(Manager):
                         break
                     else:
                         self.logger.info('Wait to active:%s' % status['status'])
-                        time.sleep(3)
+                        time.sleep(5)
                 else:
                     self.logger.info('Status not found')
 
@@ -421,7 +421,7 @@ class CloudManager(Manager):
         # Connect to Node using ssh (ip, user_id, password )
         TRY_COUNT=5
         for i in range(TRY_COUNT):
-            (tf, ssh) = self._makeSSHClient(params)
+            (tf, ssh, user_id) = self._makeSSHClient(params)
             if tf == True:
                 break
             self.logger.info("Failed to connect, try again(%s)" % i+1)
@@ -432,7 +432,13 @@ class CloudManager(Manager):
 
         # We have ssh connection
         self.logger.debug("CMD: %s" % params['cmd'])
-        stdin, stdout, stderr = ssh.exec_command(params['cmd'], bufsize=348160, timeout=300, get_pty=False)
+
+        # Assume, execute as root privileges
+        if user_id != "root":
+            cmd = "sudo %s" % params['cmd']
+        else:
+            cmd = params['cmd']
+        stdin, stdout, stderr = ssh.exec_command(cmd, bufsize=348160, timeout=300, get_pty=False)
 
         return {'result': stdout.readlines()}
 
@@ -547,9 +553,9 @@ class CloudManager(Manager):
 
         if connected == False:
             self.logger.debug(err_msg)
-            return (False, "Can not connect")
+            return (False, "Can not connect", user_id)
 
-        return (True, ssh)
+        return (True, ssh, user_id)
 
     def _getDriver(self, zone_id):
         """
