@@ -14,7 +14,9 @@ Pyengine is based on apache and python django framework
 
 ~~~bash
 apt-get update
-apt-get install -y git python-dev python-pip mariadb-server apache2 libapache2-mod-wsgi python-mysqldb libyaml-cpp-dev libyaml-dev python-paramiko
+export DEBIAN_FRONTEND=noninteractive
+apt-get -y install mariadb-server python-mysqldb
+apt-get install -y git python-dev python-pip apache2 libapache2-mod-wsgi python-mysqldb libyaml-cpp-dev libyaml-dev python-paramiko
 ~~~
 
 ## Install BPMN library
@@ -32,7 +34,6 @@ python setup.py install
 ~~~bash
 pip install django
 pip install django-log-request-id
-pip install django-cors-headers
 pip install dicttoxml
 pip install xmltodict
 pip install routes
@@ -40,6 +41,7 @@ pip install rsa
 pip install pytz
 pip install pyyaml
 pip install boto3
+pip install django-cors-headers
 ~~~
 
 ## Download source
@@ -48,7 +50,7 @@ Download pyengine source
 
 ~~~bash
 cd /opt/
-git clone https://github.com/pyengine/orchestra.git ${PROJECT}
+git clone https://github.com/bocabaton/orchestra.git ${PROJECT}
 ~~~
 
 ## Update python module path environment
@@ -95,8 +97,11 @@ a2enconf pyengine
 
 Create pyengine database
 
-~~~bash
-mysql -u root -e "create database pyengine character set utf8 collate utf8_general_ci"
+~~~expect
+spawn mysql -u root -e "create database pyengine character set utf8 collate utf8_general_ci"
+expect "Enter password: "
+send "\n";
+interact
 ~~~
 
 ## Update django DB
