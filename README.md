@@ -1,5 +1,7 @@
 # Cloud Orchestration Engine
 
+<img src="https://raw.githubusercontent.com/bocabaton/orchestra/master/docs/architecture/concept.png">
+
 # Easy Installation
 
 ## Ubuntu
