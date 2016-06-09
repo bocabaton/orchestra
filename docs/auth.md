@@ -5,8 +5,8 @@
 Keyword | Value | Description
 ----    | ----  | ----
 URL     | http://127.0.0.1/api/v1 | URL for request
-USER_ID     | sunshout | user_id for this system
-PASSWORD     | 123456 | password for this system
+USER_ID     | admin | user_id for this system
+PASSWORD     | password | password for this system
 OPENSTACK | True | If you don't want to test OpenStack, change to False
 AWS | True | If you don't want to test AWS, change to False
 KEYPAIR | True | If you don't want to register keypair change to False

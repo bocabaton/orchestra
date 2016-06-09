@@ -62,8 +62,8 @@ def makeDelete(url, header):
 
 display('Auth')
 url = '${URL}/token/get'
-user_id='root'
-password='123456'
+user_id='admin'
+password='password'
 body = {'user_id':user_id, 'password':password}
 token = makePost(url, header, body)
 token_id = token['token']

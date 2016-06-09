@@ -5,8 +5,8 @@
 Keyword | Value | Description
 ----    | ----  | ----
 URL     | http://127.0.0.1/api/v1 | URL for request
-USER_ID | root  | user_id of Orchestra account
-PASSWORD| 123456| password of Orchestra account
+USER_ID | admin  | user_id of Orchestra account
+PASSWORD| password | password of Orchestra account
 
 # Region/Zone
 
