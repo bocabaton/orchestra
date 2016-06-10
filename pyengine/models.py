@@ -127,3 +127,11 @@ class server_info(models.Model):
     value = models.CharField(max_length=2500, null=True)
 
 
+#############
+# Event
+#############
+class event(models.Model):
+    user_id = models.CharField(max_length=20)
+    group_id = models.CharField(max_length=20)
+    msg = models.CharField(max_length=256)
+    created = models.DateTimeField(auto_now_add=True, editable=False)

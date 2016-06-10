@@ -22,6 +22,9 @@ class UserDetail(Command):
 
         if self.params.has_key('add'):
             info = mgr.addUserInfo(self.params)
+            e_mgr = self.locator.getManager('EventManager')
+            e_mgr.addEvent(self.user_meta['user_id'], 'Add User Detail(%s)' % self.params['platform'])
+
         elif self.params.has_key('get'):
             info = mgr.getUserInfo(self.params)
         elif self.params.has_key('delete'):

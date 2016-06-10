@@ -21,4 +21,7 @@ class DeployStack(Command):
         ctx['xtoken'] = self.xtoken
         info = mgr.deployStack(self.params, ctx)
 
+        e_mgr = self.locator.getManager('EventManager')
+        e_mgr.addEvent(self.user_meta['user_id'], 'DeployStack(%s)' % info.output['stack_id'])
+
         return info.result()

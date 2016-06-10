@@ -23,4 +23,8 @@ class CreateServer(Command):
         ctx = {}
         ctx['user_id'] = self.user_meta['user_id']
         info = mgr.createServer(self.params, ctx)
+
+        e_mgr = self.locator.getManager('EventManager')
+        e_mgr.addEvent(self.user_meta['user_id'], 'Create Server(%s)' % info.output['name'])
+
         return info.result()

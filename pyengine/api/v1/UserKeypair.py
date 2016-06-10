@@ -20,6 +20,9 @@ class UserKeypair(Command):
 
         if self.params.has_key('add'):
             info = mgr.addUserKeypair(self.params)
+            e_mgr = self.locator.getManager('EventManager')
+            e_mgr.addEvent(self.user_meta['user_id'], 'Add User Keypair')
+
         elif self.params.has_key('get'):
             info = mgr.getUserKeypair(self.params)
         elif self.params.has_key('delete'):
