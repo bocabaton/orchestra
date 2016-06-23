@@ -10,6 +10,7 @@ PASSWORD     | password | password for this system
 OPENSTACK | True | If you don't want to test OpenStack, change to False
 AWS | True | If you don't want to test AWS, change to False
 BAREMETAL   | True  | Register Baremetal Region, Zone
+JOYENT  |   False   | Discover Joyent Region, Zone
 
 # Region/Zone
 
@@ -119,6 +120,25 @@ if ${AWS}:
     }
 
     discover = makePost(url, header, body)
+
+if ${JOYENT}:
+    display('Discover Joyent Cloud resources')
+    a_key = raw_input('Key ID: ')
+    s_key = raw_input('Secret path: ')
+ 
+    body = {
+        "discover": {
+            "type":"joyent",
+            "auth":{
+               "key_id": a_key,
+               "secret": s_key
+            }
+        }
+    }
+
+    discover = makePost(url, header, body)
+
+
 
 if ${BAREMETAL}:
     display('Add Baremetal Region & Zone')

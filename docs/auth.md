@@ -9,6 +9,7 @@ USER_ID     | admin | user_id for this system
 PASSWORD     | password | password for this system
 OPENSTACK | True | If you don't want to test OpenStack, change to False
 AWS | True | If you don't want to test AWS, change to False
+JOYENT | False | Add Joyent Account Information 
 KEYPAIR | True | If you don't want to register keypair change to False
 
 # Reqeust token
@@ -95,6 +96,14 @@ if ${AWS}:
     sa_key = raw_input('AWS Secret Access Key: ')
     body = {'add':{'access_key_id':a_key, 'secret_access_key':sa_key},'platform':'aws'}
     show(makePost(a_url, header, body))
+
+if ${JOYENT}:
+    display('Add Joyent Cloud User info')
+    a_key = raw_input('Key ID: ')
+    sa_key = raw_input('Secret path(ex. id_rsa): ')
+    body = {'add':{'key_id':a_key, 'secret':sa_key},'platform':'joyent'}
+    show(makePost(a_url, header, body))
+
 
 if ${KEYPAIR}:
     display('Add Keypair to User info')

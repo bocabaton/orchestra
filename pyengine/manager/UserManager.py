@@ -213,6 +213,13 @@ class UserManager(Manager):
                 'access_key_id':output['access_key_id'],
                 'secret_access_key':output['secret_access_key']
                 }
+
+        elif params['platform'] == 'joyent':
+            result['auth'] = {
+                'key_id':output['key_id'],
+                'secret':output['secret']
+                }
+ 
         elif params['platform'] == 'bare-metal':
             # TODO: what should we do?
             pass

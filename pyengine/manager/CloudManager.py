@@ -234,8 +234,22 @@ class CloudManager(Manager):
             driver = self.locator.getManager('AwsDriver')
             (output, total_count) = driver.discover(value)
             return (output, total_count)
-        # TODO: GCE Driver, Joyent Driver
 
+        # TODO: GCE Driver, Joyent Driver
+        """
+        {"discover": {
+            "type":"joyent",
+            "auth":{
+               "key_id":"/{account}/keys/{key_id_name}",
+               "secret_access_key":"/root/.ssh/joyent_id_rsa"
+            }
+        }
+        """
+        if value['type'] == 'joyent':
+            driver = self.locator.getManager('JoyentDriver')
+            (output, total_count) = driver.discover(value)
+            return (output, total_count)
+ 
 
     ###############################################
     # Server 
@@ -304,6 +318,8 @@ class CloudManager(Manager):
         # Update Private IP address
         if created_server.has_key('private_ip_address'):
             self.updateServerInfo(server.server_id, 'private_ip_address', created_server['private_ip_address'])
+        if created_server.has_key('floating_ip'):
+            self.updateServerInfo(server.server_id, 'floatingip', created_server['floating_ip'])
 
         # Update server_info
         # ex) server_id from nova
@@ -341,6 +357,8 @@ class CloudManager(Manager):
             if platform == "aws":
                 key_user_id = "ec2-user"
             elif platform == "openstack":
+                key_user_id = "root"
+            elif platform == "joyent":
                 key_user_id = "root"
             else:
                 key_user_id = "root"
@@ -568,6 +586,7 @@ class CloudManager(Manager):
         driver_dic = {'openstack':'OpenStackDriver',
                 'aws':'AwsDriver',
                 'bare-metal':'BaremetalDriver',
+                'joyent':'JoyentDriver',
             }
         param = {'zone_id':zone_id}
         zone_info = self.getZone(param)
