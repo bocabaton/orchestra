@@ -254,6 +254,74 @@ class CloudManager(Manager):
     ###############################################
     # Server 
     ###############################################
+    def registerServer(self, params, ctx):
+        """
+        @param:
+            {"zone_id":"xxxx-xxx-xxxxx-xxxxx",
+             "name":"vm1",
+             "floatingIP":True,
+             "key_name":"my_keypair_name",
+             "stack_id":"xxx-xxxx-xxxxxx",
+             "register":True,
+             "request":{
+                "server_id":"xxxx-xxxx-xxxxx"
+              }
+            }
+
+         @ctx: context
+            ctx['user_id']
+
+        """
+        # Update DB first
+        dao = self.locator.getDAO('server')
+        dic = {}
+        dic['name'] = params['name']
+        if params.has_key('zone_id'):
+            z_dao = self.locator.getDAO('zone')
+            zones = z_dao.getVOfromKey(zone_id=params['zone_id'])
+            if zones.count() == 0:
+                raise ERROR_INVALID_PARAMETER(key='zone_id', value=params['zone_id'])
+            dic['zone'] = zones[0]
+        server = dao.insert(dic)
+
+        # 1. Detect Driver
+        (driver, platform) = self._getDriver(params['zone_id'])
+        # 2. Call deploy
+        usr_mgr = self.locator.getManager('UserManager')
+        auth_params = {'get':ctx['user_id'], 'platform':platform}
+        self.logger.debug("auth:%s" % auth_params)
+        auth = usr_mgr.getUserInfo(auth_params)
+        #auth = {"auth":{
+        #    "tenantName":"choonho.son",
+        #    "passwordCredentials":{
+        #        "username": "choonho.son",
+        #        "password": "123456"
+        #    }
+        #}
+        #}
+        zone_id = params['zone_id']
+        """
+        'req': {'server_id':'xxxx-xxxx-xxxxx'}
+        """
+        req=params['request']
+        discovered_server = driver.discoverServer(auth, zone_id, req)
+ 
+        # Update server_info
+        # Detect server information
+        # params['request']
+        # @private_ip_address
+        # @public_ip_address
+        # 
+        self.updateServerInfo(server.server_id, 'server_id', discovered_server['server_id'])
+        # Update Private IP address
+        if discovered_server.has_key('private_ip_address'):
+            self.updateServerInfo(server.server_id, 'private_ip_address', discovered_server['private_ip_address'])
+        if discovered_server.has_key('floating_ip'):
+            self.updateServerInfo(server.server_id, 'floatingip', discovered_server['floating_ip'])
+
+
+        return self.locator.getInfo('ServerInfo', server)
+
     def createServer(self, params, ctx):
         """
         @param:
@@ -261,6 +329,7 @@ class CloudManager(Manager):
              "name":"vm1",
              "floatingIP":True,
              "key_name":"my_keypair_name",
+             "stack_id":"xxx-xxxx-xxxxxx",
              "request":{
                 "server":{
                    "name":"vm1",
@@ -275,6 +344,7 @@ class CloudManager(Manager):
              "name":"server01",
              "floatingIP":False,
              "key_name":"my_keypair_name",
+             "stack_id":"xxxx-xxxx-xxx-xxx",
              "request": {
                 "private_ip_address":"192.168.1.1",
              }
@@ -423,7 +493,7 @@ class CloudManager(Manager):
                 return {key: items[key]}
         return {}
 
-    def listServers(self, search):
+    def listServers(self, search, brief=False):
         server_dao = self.locator.getDAO('server')
 
         output = []
@@ -431,10 +501,44 @@ class CloudManager(Manager):
 
         for server in servers:
             server_info = self.locator.getInfo('ServerInfo', server)
+            if brief == True:
+                server_info2 = self.getServerBrief({'server_id':server_info.output['server_id']})
+                server_info = self.locator.getInfo('ServerInfoBrief', server_info2)
             output.append(server_info)
 
         return (output, total_count)
 
+
+    def getServerBrief(self, params):
+        """
+        @params:
+            {'server_id':xxxxx}
+        Assume: server_id is always exist
+        """
+        server_id = params['server_id']
+        s_info = self.getServerInfo(server_id)
+        dic = {}
+        if s_info.has_key('private_ip_address'):
+            dic['private_ip'] = s_info['private_ip_address']
+        else:
+            dic['private_ip'] = ""
+        if s_info.has_key('floatingp'):
+            dic['public_ip'] = s_info['floatingip']
+        else:
+            dic['public_ip'] = ""
+        if s_info.has_key('user_id'):
+            dic['login_id'] = s_info['user_id']
+        else:
+            dic['login_id'] = ""
+        if s_info.has_key('server_id'):
+            dic['server_id'] = s_info['server_id']
+        else:
+            dic['server_id'] = ""
+        if s_info.has_key('stack_id'):
+            dic['stack_id'] = s_info['stack_id']
+        else:
+            dic['stack_id'] = ""
+        return dic
 
     #####################################
     # SSH executor

@@ -113,6 +113,40 @@ class JoyentDriver(Manager):
         server['floating_ip'] = instance.public_ips[0]
         return server
 
+    def discoverServer(self, auth, zone_id, req):
+        """
+         @param : auth
+            {"auth":{
+               "key_id":"Key ID",
+               "secret":"Secret Key",
+                }
+            }
+        @param: zone_id
+        @param: req (Dic)
+            {"server_id":"xxx-xxxx-xxx"}
+        """
+        # 1. Get Endpoint of Zone
+        cloudMgr = self.locator.getManager('CloudManager')
+        (r_name, z_name) = cloudMgr._getRegionZone(zone_id)
+
+        auth_data = auth['auth']
+        a_key = auth_data['key_id']
+        s_key = auth_data['secret']
+
+        # 2. Create DataCenter object
+        sdc = DataCenter(location=z_name, key_id=a_key, secret=s_key)
+
+        if req.has_key('server_id'):
+            mid = req['server_id']
+            machine = sdc.machine(machine_id=mid)
+            dic = {}
+            dic['server_id'] = machine.id
+            dic['private_ip_address'] = machine.ips[0]
+            if machine.ips.len() >= 2:
+                dic['floating_ip'] = machine.ips[1]
+            dic['status'] = machine.state
+            return dic
+
     def getServerStatus(self, auth, zone_id, server_id):
         return {'status':'running'}
 

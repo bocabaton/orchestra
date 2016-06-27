@@ -10,8 +10,10 @@ class CreateServer(Command):
         'zone_id': ('r', 'str'),
         'key_name': ('o', 'str'),
         'login_id': ('o', 'str'),
+        'stack_id': ('o', 'str'),
         'floatingIP': ('o', 'bool'),
         'request': ('r', 'dic'),
+        'register': ('o', 'bool'),
     }
     
     def __init__(self, api_request):
@@ -22,7 +24,10 @@ class CreateServer(Command):
 
         ctx = {}
         ctx['user_id'] = self.user_meta['user_id']
-        info = mgr.createServer(self.params, ctx)
+        if self.params.has_key('register'):
+            info = mgr.registerServer(self.params, ctx)
+        else:
+            info = mgr.createServer(self.params, ctx)
 
         e_mgr = self.locator.getManager('EventManager')
         e_mgr.addEvent(self.user_meta['user_id'], 'Create Server(%s)' % info.output['name'])

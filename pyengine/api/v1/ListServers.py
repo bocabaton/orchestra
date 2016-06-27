@@ -8,6 +8,7 @@ class ListServers(Command):
         'server_id': ('o', 'str'),
         'name': ('o', 'str'),
         'zone_id': ('o', 'str'),
+        'brief': ('o', 'str'),
     }
     
     def __init__(self, api_request):
@@ -18,7 +19,12 @@ class ListServers(Command):
 
         mgr = self.locator.getManager('CloudManager')
 
-        (infos, total_count) = mgr.listServers(search)
+        if self.params.has_key('brief'):
+            brief = True
+        else:
+            brief = False
+
+        (infos, total_count) = mgr.listServers(search, brief)
 
         response = {}
         response['total_count'] = total_count
