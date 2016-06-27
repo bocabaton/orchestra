@@ -376,6 +376,12 @@ class CloudManager(Manager):
             self.updateServerInfo(server.server_id,'user_id','root')
             self.updateServerInfo(server.server_id,'password','123456')
 
+        ########################
+        # Update Stack ID
+        ########################
+        if params.has_key('stack_id') == True:
+            self.updateServerInfo(server.server_id, 'stack_id', params['stack_id'])
+
         return self.locator.getInfo('ServerInfo', server)
 
 
