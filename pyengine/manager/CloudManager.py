@@ -358,6 +358,9 @@ class CloudManager(Manager):
         dao = self.locator.getDAO('server')
         dic = {}
         dic['name'] = params['name']
+        dic['cpus'] = 1
+        dic['memory'] = 1
+        dic['disk'] = 1
         if params.has_key('zone_id'):
             z_dao = self.locator.getDAO('zone')
             zones = z_dao.getVOfromKey(zone_id=params['zone_id'])
@@ -452,8 +455,29 @@ class CloudManager(Manager):
         if params.has_key('stack_id') == True:
             self.updateServerInfo(server.server_id, 'stack_id', params['stack_id'])
 
+        #########################
+        # Update Server
+        # (cpu, memory, disk)
+        #########################
+        if created_server.has_key('cpus'):
+            server = self.updateServer(server.server_id, 'cpus', created_server['cpus'])
+        if created_server.has_key('memory'):
+            server = self.updateServer(server.server_id, 'memory', created_server['memory'])
+        if created_server.has_key('disk'):
+            server = self.updateServer(server.server_id, 'disk', created_server['disk'])
+
         return self.locator.getInfo('ServerInfo', server)
 
+    def updateServer(self, server_id, key, value):
+        """
+        update server table field=key, value=value
+        @return: server dao
+        """
+        server_dao = self.locator.getDAO('server')
+        dic = {}
+        dic[key] = value
+        server = server_dao.update(server_id, dic, 'server_id')
+        return server
 
     def updateServerInfo(self, server_id, key, value):
         """
@@ -503,7 +527,8 @@ class CloudManager(Manager):
             server_info = self.locator.getInfo('ServerInfo', server)
             if brief == True:
                 server_info2 = self.getServerBrief({'server_id':server_info.output['server_id']})
-                server_info = self.locator.getInfo('ServerInfoBrief', server_info2)
+                #server_info3 = self.locator.getInfo('ServerInfoBrief', server_info2)
+                server_info.output['brief'] = server_info2
             output.append(server_info)
 
         return (output, total_count)

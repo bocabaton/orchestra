@@ -120,6 +120,9 @@ class server(models.Model):
     zone = models.ForeignKey('zone', to_field='zone_id', null=False)
     server_id = models.UUIDField(default=uuid.uuid4, unique=True)
     name = models.CharField(max_length=20)
+    cpus = models.FloatField(null=True)
+    memory = models.FloatField(null=True)
+    disk = models.FloatField(null=True)
 
 class server_info(models.Model):
     server = models.ForeignKey('server', to_field='server_id', null=False)

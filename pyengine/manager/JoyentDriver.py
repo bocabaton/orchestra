@@ -111,6 +111,16 @@ class JoyentDriver(Manager):
         server['private_ip_address'] = instance.private_ips[0]
         self.logger.debug("Create Server => private IP:%s" % instance.private_ips[0])
         server['floating_ip'] = instance.public_ips[0]
+
+        # CPU, Memory, Disk
+        if req.has_key('package'):
+            packages = sdc.packages(req['package'])
+            if len(packages) == 1:
+                package = packages[0]
+                server['cpus'] = package['vcpus']
+                server['memory'] = package['memory']
+                server['disk'] = package['disk']
+
         return server
 
     def discoverServer(self, auth, zone_id, req):
