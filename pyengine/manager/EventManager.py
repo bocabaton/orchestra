@@ -8,12 +8,13 @@ class EventManager(Manager):
 
     GLOBAL_CONF = config.getGlobalConfig()
 
-    def addEvent(self, user_id, msg, group_id=""):
+    def addEvent(self, user_id, msg, msg_type="info", group_id=""):
         event_dao = self.locator.getDAO('event') 
 
         dic = {}
         dic['user_id'] = user_id
         dic['msg'] = msg
+        dic['msg_type'] = msg_type
         dic['group_id'] = group_id
 
         event = event_dao.insert(dic)

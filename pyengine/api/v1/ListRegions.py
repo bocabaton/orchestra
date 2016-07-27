@@ -7,6 +7,7 @@ class ListRegions(Command):
     req_params = {
         'region_id': ('o', 'str'),
         'name': ('o', 'str'),
+        'brief': ('o', 'str'),
     }
     
     def __init__(self, api_request):
@@ -17,7 +18,12 @@ class ListRegions(Command):
 
         mgr = self.locator.getManager('CloudManager')
 
-        (infos, total_count) = mgr.listRegions(search)
+        if self.params.has_key('brief') == True:
+            brief = True
+        else:
+            brief = False
+
+        (infos, total_count) = mgr.listRegions(search, brief)
 
         response = {}
         response['total_count'] = total_count

@@ -1,7 +1,7 @@
 from pyengine.lib.error import *
 from pyengine.lib.command import Command
 
-DEFAULT_LIMIT = 20
+DEFAULT_LIMIT = 50
 
 class ListEvents(Command):
 
@@ -9,7 +9,7 @@ class ListEvents(Command):
     req_params = {
         'user_id': ('o', 'str'),
         'group_id': ('o', 'str'),
-        'limit': ('o', 'int'),
+        'limit': ('o', 'str'),
     }
     
     def __init__(self, api_request):
@@ -20,7 +20,7 @@ class ListEvents(Command):
         search_or = self.params.get('search_or', [])
         sort = self.params.get('sort', {'key': 'created', 'desc':True})
         if self.params.has_key('limit'):
-            page = self.params.get('page', {'limit':self.params['limit']})
+            page = self.params.get('page', {'limit':int(self.params['limit'])})
         else:
             page = self.params.get('page', {'limit':DEFAULT_LIMIT})
         res_params = self.params.get('res_params', [])

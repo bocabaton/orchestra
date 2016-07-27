@@ -23,7 +23,8 @@ class CloudManager(Manager):
         region_dao = self.locator.getDAO('region') 
 
         if region_dao.isExist(name=params['name']):
-            raise ERROR_EXIST_RESOURCE(key='name', value=params['name'])
+            return self.getRegionByName(params)
+            #raise ERROR_EXIST_RESOURCE(key='name', value=params['name'])
 
         dic = {}
         dic['name'] = params['name']
@@ -77,7 +78,18 @@ class CloudManager(Manager):
 
         return self.locator.getInfo('RegionInfo', regions[0])
 
-    def listRegions(self, search):
+    def getRegionByName(self, params):
+        region_dao = self.locator.getDAO('region')
+
+        regions = region_dao.getVOfromKey(name=params['name'])
+
+        if regions.count() == 0:
+            raise ERROR_NOT_FOUND(key='name', value=params['name'])
+
+        return self.locator.getInfo('RegionInfo', regions[0])
+
+
+    def listRegions(self, search, brief=False):
         region_dao = self.locator.getDAO('region')
 
         output = []
@@ -85,6 +97,19 @@ class CloudManager(Manager):
 
         for region in regions:
             region_info = self.locator.getInfo('RegionInfo', region)
+            # Brief
+            if brief == True:
+                # get zone
+                # get server list
+                total_servers = 0
+                z_params = [{'key':'region_id','value':region_info.output['region_id'],'option':'eq'}]
+                (zones, total_zones) = self.listZones(z_params)
+                for zone in zones:
+                    s_params = [{'key':'zone_id','value':zone.output['zone_id'],'option':'eq'}]
+                    (servers, total) = self.listServers(s_params)
+                    total_servers = total_servers + total
+                dic = {'total_servers':total_servers, 'total_zones':total_zones}
+                region_info.output['brief'] = dic
             output.append(region_info)
 
         return (output, total_count)
@@ -166,13 +191,20 @@ class CloudManager(Manager):
         """
         dao = self.locator.getDAO('zone_detail')
         for kv in params['create']:
+            self.logger.debug("Create")
+            self.logger.debug(kv)
             search = [{'key':'zone_id', 'value':params['zone_id'], 'option':'eq'},
                       {'key':'key', 'value':kv['key'], 'option':'eq'}]
             (items, total_count) = dao.select(search=search)
             if total_count == 0:
                 # Create
+                z_dao = self.locator.getDAO('zone')
+                zones = z_dao.getVOfromKey(zone_id=params['zone_id'])
+                if zones.count() != 1:
+                    raise ERROR_INVALID_PARAMETER(key='zone_id', value=params['zone_id'])
+
                 dic = {}
-                dic['zone_id'] = params['zone_id']
+                dic['zone'] = zones[0]
                 dic['key'] = kv['key']
                 dic['value'] = kv['value']
                 dao.insert(dic)
@@ -182,6 +214,27 @@ class CloudManager(Manager):
                 # TODO: 
                 pass
 
+    def _getZoneDetail(self, zone_id):
+        """
+        @param: zone_id
+        @description: get zone detail for driver
+        @return: dictionary of zone_detail 
+        """
+        dao = self.locator.getDAO('zone_detail')
+        details = dao.getVOfromKey(zone_id=zone_id)
+        dic = {}
+        for detail in details:
+            dic[detail.key] = detail.value
+        return dic
+
+    def _getZonePlatform(self, zone_id):
+        """
+        @return: platform name
+        """
+        param = {'zone_id':zone_id}
+        zone_info = self.getZone(param)
+        return zone_info.output['platform']
+ 
     def _getRegionZone(self, zone_id):
         """
         @param: zone_id
@@ -197,7 +250,7 @@ class CloudManager(Manager):
     ###########################################
     # Cloud Discover
     ###########################################
-    def discoverCloud(self, params):
+    def discoverCloud(self, params, ctx=None):
         """
         params:
         {"discover": {
@@ -215,10 +268,18 @@ class CloudManager(Manager):
         value = params['discover']
         if value.has_key('type') == False:
             raise ERROR_INVALID_PARAMETER(key='discover', value=params['discover'])
+
+        if value.has_key('auth') == False:
+            # Discover Auth from ctx
+            auth_params = {'get':ctx['user_id'], 'platform':value['type']}
+            usr_mgr = self.locator.getManager('UserManager')
+            auth = usr_mgr.getUserInfo(auth_params)
+            value.update(auth)
+ 
         # OpenStack Driver
         if value['type'] == 'openstack':
             driver = self.locator.getManager('OpenStackDriver')
-            (output, total_count) = driver.discover(value)
+            (output, total_count) = driver.discover(value, ctx)
             return (output, total_count)
 
         """
@@ -232,7 +293,7 @@ class CloudManager(Manager):
         """
         if value['type'] == 'aws':
             driver = self.locator.getManager('AwsDriver')
-            (output, total_count) = driver.discover(value)
+            (output, total_count) = driver.discover(value, ctx)
             return (output, total_count)
 
         # TODO: GCE Driver, Joyent Driver
@@ -247,15 +308,83 @@ class CloudManager(Manager):
         """
         if value['type'] == 'joyent':
             driver = self.locator.getManager('JoyentDriver')
-            (output, total_count) = driver.discover(value)
+            (output, total_count) = driver.discover(value, ctx)
             return (output, total_count)
- 
+
+    def discoverServers(self, params, ctx):
+        """
+        discover Servers based on auth
+        @params:
+            {'zone_id':xxxxxx}
+        """
+        # Discover Auth from ctx
+        auth_params = {'get':ctx['user_id'], 'platform':value['type']}
+        usr_mgr = self.locator.getManager('UserManager')
+        auth = usr_mgr.getUserInfo(auth_params)
+
+        zone_id = params['zone_id']
+        (driver, platform) = self._getDriver(zone_id)
+        servers = driver.discoverServers(auth, zone_id)
 
     ###############################################
     # Server 
     ###############################################
+    def registerServerByServerInfo(self, zone_id, discovered_server, ctx):
+        """
+        @params:
+            discovered_server : dictionary
+                server_info['server_id']
+                server_info['private_ip_address']
+                server_info['floating_ip']
+        """
+        # Create DB first
+        dao = self.locator.getDAO('server')
+        dic = {}
+        if discovered_server.has_key('name'):
+            dic['name'] = discovered_server['name']
+        else:
+            dic['name'] = ''
+        dic['cpus'] = 0
+        dic['memory'] = 0
+        dic['disk'] = 0
+        if discovered_server.has_key('status'):
+            dic['status'] = discovered_server['status']
+        else:
+            dic['status'] = 'unknown'
+        if zone_id:
+            z_dao = self.locator.getDAO('zone')
+            zones = z_dao.getVOfromKey(zone_id=zone_id)
+            if zones.count() == 0:
+                raise ERROR_INVALID_PARAMETER(key='zone_id', value=zone_id)
+            dic['zone'] = zones[0]
+        if ctx:
+            # Update User
+            user_id = ctx['user_id']
+            u_dao = self.locator.getDAO('user')
+            users = u_dao.getVOfromKey(user_id=user_id)
+            if users.count() != 1:
+                raise ERROR_INVALID_PARAMETER(key='user_id', value=user_id)
+            dic['user'] = users[0]
+ 
+        server = dao.insert(dic)
+
+        self.updateServerInfo(server.server_id, 'server_id', discovered_server['server_id'])
+        # Update Private IP address
+        if discovered_server.has_key('private_ip_address'):
+            self.updateServerInfo(server.server_id, 'private_ip_address', discovered_server['private_ip_address'])
+        if discovered_server.has_key('floating_ip'):
+            self.updateServerInfo(server.server_id, 'floatingip', discovered_server['floating_ip'])
+
+
+        return self.locator.getInfo('ServerInfo', server)
+
+
+
     def registerServer(self, params, ctx):
         """
+        Find Server based on server_id
+        then register it
+
         @param:
             {"zone_id":"xxxx-xxx-xxxxx-xxxxx",
              "name":"vm1",
@@ -282,6 +411,14 @@ class CloudManager(Manager):
             if zones.count() == 0:
                 raise ERROR_INVALID_PARAMETER(key='zone_id', value=params['zone_id'])
             dic['zone'] = zones[0]
+
+        # Update User
+        u_dao = self.locator.getDAO('user')
+        users = u_dao.getVOfromKey(user_id=ctx['user_id'])
+        if users.count() != 1:
+            raise ERROR_INVALID_PARAMETER(key='user_id', value=ctx['user_id'])
+        dic['user'] = users[0]
+
         server = dao.insert(dic)
 
         # 1. Detect Driver
@@ -318,6 +455,12 @@ class CloudManager(Manager):
             self.updateServerInfo(server.server_id, 'private_ip_address', discovered_server['private_ip_address'])
         if discovered_server.has_key('floating_ip'):
             self.updateServerInfo(server.server_id, 'floatingip', discovered_server['floating_ip'])
+
+        ########################
+        # Update Stack ID
+        ########################
+        if params.has_key('stack_id') == True:
+            self.updateServerInfo(server.server_id, 'stack_id', params['stack_id'])
 
 
         return self.locator.getInfo('ServerInfo', server)
@@ -361,12 +504,20 @@ class CloudManager(Manager):
         dic['cpus'] = 1
         dic['memory'] = 1
         dic['disk'] = 1
+        # Update Zone
         if params.has_key('zone_id'):
             z_dao = self.locator.getDAO('zone')
             zones = z_dao.getVOfromKey(zone_id=params['zone_id'])
             if zones.count() == 0:
                 raise ERROR_INVALID_PARAMETER(key='zone_id', value=params['zone_id'])
             dic['zone'] = zones[0]
+        # Update User
+        u_dao = self.locator.getDAO('user')
+        users = u_dao.getVOfromKey(user_id=ctx['user_id'])
+        if users.count() != 1:
+            raise ERROR_INVALID_PARAMETER(key='user_id', value=ctx['user_id'])
+        dic['user'] = users[0]
+ 
         server = dao.insert(dic)
 
         # 1. Detect Driver
@@ -466,6 +617,13 @@ class CloudManager(Manager):
         if created_server.has_key('disk'):
             server = self.updateServer(server.server_id, 'disk', created_server['disk'])
 
+        ##########################
+        # Update Server state
+        ##########################
+        if created_server.has_key('status'):
+            self.logger.debug("Update Server status:%s" % created_server['status'])
+            server = self.updateServer(server.server_id, 'status', created_server['status'])
+    
         return self.locator.getInfo('ServerInfo', server)
 
     def updateServer(self, server_id, key, value):
@@ -547,7 +705,7 @@ class CloudManager(Manager):
             dic['private_ip'] = s_info['private_ip_address']
         else:
             dic['private_ip'] = ""
-        if s_info.has_key('floatingp'):
+        if s_info.has_key('floatingip'):
             dic['public_ip'] = s_info['floatingip']
         else:
             dic['public_ip'] = ""
@@ -561,10 +719,75 @@ class CloudManager(Manager):
             dic['server_id'] = ""
         if s_info.has_key('stack_id'):
             dic['stack_id'] = s_info['stack_id']
+            pmgr = self.locator.getManager('PackageManager')
+            stack_info = pmgr.getStackByID(s_info['stack_id'])
+            dic['stack_name'] = stack_info.output['name']
         else:
             dic['stack_id'] = ""
+            dic['stack_name'] = ""
         return dic
 
+
+    def deleteServer(self, params, ctx):
+        dao = self.locator.getDAO('server') 
+
+        servers = dao.getVOfromKey(server_id=params['server_id'])
+
+        if servers.count() == 0:
+            raise ERROR_NOT_FOUND(key='server_id', value=params['server_id'])
+
+        # Update Status to "deleting"
+        self.updateServer(servers[0].server_id, 'status', 'deleting')
+ 
+        # 1. Detect Driver
+        (driver, platform) = self._getDriver(servers[0].zone_id)
+        self.logger.debug("Detected (%s,%s)" % (driver, platform))
+ 
+        # Delete server_info first
+        si_dao = self.locator.getDAO('server_info')
+        sis = si_dao.getVOfromKey(server=servers[0])
+
+        # Detected server_id at server_info
+        param2 = {'get':'server_id', 'server_id':params['server_id']}
+        server_info = self.getServerInfo2(param2)
+        ignore_driver = False
+        if server_info.has_key('server_id') == False:
+            #raise ERROR_NOT_FOUND(key='server_id', value=params['server_id'])
+            # May be wrong DB, ignore
+            self.logger.error("server_info has no server_id:%s" % params['server_id'])
+            ignore_driver = True
+
+        # 2. Call delete
+        usr_mgr = self.locator.getManager('UserManager')
+        auth_params = {'get':ctx['user_id'], 'platform':platform}
+        self.logger.debug("auth:%s" % auth_params)
+        auth = usr_mgr.getUserInfo(auth_params)
+        #auth = {"auth":{
+        #    "tenantName":"choonho.son",
+        #    "passwordCredentials":{
+        #        "username": "choonho.son",
+        #        "password": "123456"
+        #    }
+        #}
+        #}
+        zone_id = servers[0].zone_id
+        self.logger.debug("Server at Zone ID:%s" % zone_id)
+        """
+        'req': {'server_id':'xxxx-xxxx-xxxxx'}
+        """
+        if ignore_driver == False:
+            req={'server_id':server_info['server_id']}
+            deleted_server = driver.deleteServer(auth, zone_id, req)
+ 
+        self.logger.debug("Delete Server Info(%s)" % len(sis))
+        sis.delete()
+
+        self.logger.debug("Delete Server(%s)" % len(servers))
+        servers.delete()
+
+        return {}
+
+ 
     #####################################
     # SSH executor
     #####################################
@@ -722,6 +945,7 @@ class CloudManager(Manager):
                 'aws':'AwsDriver',
                 'bare-metal':'BaremetalDriver',
                 'joyent':'JoyentDriver',
+                'docker':'DockerDriver',
             }
         param = {'zone_id':zone_id}
         zone_info = self.getZone(param)

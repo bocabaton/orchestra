@@ -15,7 +15,7 @@ class BaremetalDriver(Manager):
 
     GLOBAL_CONF = config.getGlobalConfig()
 
-    def discover(self, param):
+    def discover(self, param, ctx):
         """
         @param: 
             "auth":{

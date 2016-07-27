@@ -23,6 +23,7 @@ class user_detail(models.Model):
     platform = models.CharField(max_length=20, null=True)
     key = models.CharField(max_length=128, null=True)
     value = models.CharField(max_length=256, null=True)
+    tag = models.CharField(max_length=256, null=True, default='')
 
 class user_keypair(models.Model):
     user = models.ForeignKey('user', to_field='user_id')
@@ -78,10 +79,12 @@ class tag(models.Model):
 
 class stack(models.Model):
     stack_id = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, default='')
     package = models.ForeignKey('package', to_field='package_id', null=False)
     env = models.CharField(max_length=10240, null=True)
     state = models.CharField(max_length=20, default='builing')
     created = models.DateTimeField(auto_now_add=True, editable=False)
+    user = models.ForeignKey('user', to_field='user_id')
  
 ############
 # Workflow
@@ -120,9 +123,11 @@ class server(models.Model):
     zone = models.ForeignKey('zone', to_field='zone_id', null=False)
     server_id = models.UUIDField(default=uuid.uuid4, unique=True)
     name = models.CharField(max_length=20)
-    cpus = models.FloatField(null=True)
-    memory = models.FloatField(null=True)
-    disk = models.FloatField(null=True)
+    cpus = models.FloatField(default=1, null=True)
+    memory = models.FloatField(default=1, null=True)
+    disk = models.FloatField(default=1, null=True)
+    status = models.CharField(default='unknown', null=True, max_length=16)
+    user = models.ForeignKey('user', to_field='user_id')
 
 class server_info(models.Model):
     server = models.ForeignKey('server', to_field='server_id', null=False)
@@ -136,5 +141,6 @@ class server_info(models.Model):
 class event(models.Model):
     user_id = models.CharField(max_length=20)
     group_id = models.CharField(max_length=20)
+    msg_type = models.CharField(max_length=16, default="info")
     msg = models.CharField(max_length=256)
     created = models.DateTimeField(auto_now_add=True, editable=False)

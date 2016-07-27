@@ -8,15 +8,16 @@ from pyengine.lib.error import *
 from pyengine.manager import Manager 
 
 class StackThread(threading.Thread):
-    def __init__(self, driver, template, env, stack_id):
+    def __init__(self, driver, template, env, stack_id, ctx):
         threading.Thread.__init__(self)
         self.driver = driver
         self.template = template
         self.env = env
         self.stack_id = stack_id
+        self.ctx = ctx
 
     def run(self):
-        self.driver.run(self.template, self.env, self.stack_id)
+        self.driver.run(self.template, self.env, self.stack_id, self.ctx)
 
 
 class PackageManager(Manager):
@@ -115,12 +116,13 @@ class PackageManager(Manager):
     def deployStack(self, params, ctx):
         """
         @params:
+            - name
             - package_id
             - env
         @ctx: context of account
             - ctx['user_id']
             - ctx['xtoken']
-
+            - ctx['name'] : project name
         """
 
         # find pkg_type, template
@@ -141,7 +143,22 @@ class PackageManager(Manager):
             raise ERROR_INVALID_PARAMETER(key='package_id', value=params['package_id'])
         dic['package']   = packages[0] 
         dic['env'] = json.dumps(env)
+        # User
+        user_dao = self.locator.getDAO('user')
+        users = user_dao.getVOfromKey(user_id=ctx['user_id'])
+        if users.count() != 1:
+            raise ERROR_NOT_FOUND(key='user_id', value=ctx['user_id'])
+        dic['user'] = users[0]
+
+        # Name
+        if params.has_key('name'):
+            dic['name'] = params['name']
+        else:
+            dic['name'] = ''
         stack = dao.insert(dic)
+
+        if ctx.has_key('name') == False:
+            ctx['name'] = stack.name[:8]
 
         self.logger.debug("### Stack ID:%s" % stack.stack_id)
         # Update Env
@@ -152,15 +169,25 @@ class PackageManager(Manager):
         self.addEnv2(stack.stack_id, item)
 
         # Update Env(token)
-        item = {'jeju':{'TOKEN':ctx['xtoken']}}
+        # Add Stack ID for provisioning
+        item = {'jeju':{'TOKEN':ctx['xtoken'],'STACK_ID':"%s" % stack.stack_id}}
         self.addEnv2(stack.stack_id, item)
 
         if pkg_type == "bpmn":
             # BPMN Driver
+            self.logger.debug("Launch BPMN Driver")
             driver = self.locator.getManager('BpmnDriver')
-            thread = StackThread(driver, template, env, stack.stack_id)
+            thread = StackThread(driver, template, env, stack.stack_id, ctx)
             thread.start()
             #driver.run(template, env, stack.stack_id)
+        elif pkg_type == "docker-compose":
+            # Docker-Compose
+            self.logger.debug("Launch Docker-Compose driver")
+            driver = self.locator.getManager('DockerComposeDriver')
+            self.logger.debug(driver)
+            thread = StackThread(driver, template, env, stack.stack_id, ctx)
+            thread.start()
+
         return self.getStackByID(stack.stack_id)
 
     def listStacks(self, search, search_or, sort, page):

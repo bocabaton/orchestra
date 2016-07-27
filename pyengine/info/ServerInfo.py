@@ -13,3 +13,4 @@ class ServerInfo(VOInfo):
         self.output['server_id'] = self.vo.server_id
         self.output['name'] = self.vo.name
         self.output['zone_id'] = self.vo.zone_id
+        self.output['status'] = self.vo.status

@@ -19,7 +19,9 @@ class DiscoverCloud(Command):
 
         # Discovery
         if self.params.has_key('discover'):
-            (infos, total_count) = mgr.discoverCloud(self.params)
+            ctx = {}
+            ctx['user_id'] = self.user_meta['user_id']
+            (infos, total_count) = mgr.discoverCloud(self.params, ctx)
             response = {}
             response['total_count'] = total_count
             response['results'] = []

@@ -13,4 +13,5 @@ class EventInfo(VOInfo):
         self.output['user_id'] = self.vo.user_id
         self.output['group_id'] = self.vo.group_id
         self.output['msg'] = self.vo.msg
+        self.output['msg_type'] = self.vo.msg_type
         self.output['created'] = self.vo.created

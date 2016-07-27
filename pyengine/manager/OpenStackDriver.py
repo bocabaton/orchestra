@@ -12,7 +12,7 @@ class OpenStackDriver(Manager):
 
     GLOBAL_CONF = config.getGlobalConfig()
 
-    def discover(self, param):
+    def discover(self, param, ctx):
         """
         @param: 
             "keystone":"http://10.1.0.1:5000/v2.0",

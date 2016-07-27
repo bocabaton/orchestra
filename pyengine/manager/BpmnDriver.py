@@ -266,7 +266,7 @@ class BpmnDriver(Manager):
 
             self.workflow.do_engine_steps()
 
-    def run(self, template, env, stack_id):
+    def run(self, template, env, stack_id, ctx):
         """
         @params:
             -template:

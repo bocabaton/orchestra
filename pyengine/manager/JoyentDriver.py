@@ -16,7 +16,7 @@ class JoyentDriver(Manager):
 
     GLOBAL_CONF = config.getGlobalConfig()
 
-    def discover(self, param):
+    def discover(self, param, ctx):
         """
         @param: 
             "auth":{
@@ -57,6 +57,20 @@ class JoyentDriver(Manager):
                          'region_id': region_info.output['region_id'],
                          'zone_type': 'joyent'}
                 zone_info = cloudMgr.createZone(param)
+
+                # Update Zone Detail for DOCKER_HOST
+                zone_id = zone_info.output['zone_id']
+                self.logger.debug("Add Zone Detail at %s" % zone_id)
+                # NOTICE:
+                docker_url = 'tcp://%s.docker.joyent.com:2376' % region
+                p2 = {'zone_id': zone_id, 'create':[{'key':'DOCKER_HOST','value':docker_url},
+                                                {'key':'DOCKER_TLS_VERIFY','value':'1'}]}
+                cloudMgr.createZoneDetail(p2)
+
+                # Discover ALL servers and register them
+                servers = self.discoverServers({'auth':auth}, zone_id)
+                for server in servers:
+                    cloudMgr.registerServerByServerInfo(zone_id, server, ctx)
 
         # return Zones
         return (output, total_count)
@@ -109,8 +123,9 @@ class JoyentDriver(Manager):
         server['status'] = instance.status()
         server['server_id'] = instance.id
         server['private_ip_address'] = instance.private_ips[0]
-        self.logger.debug("Create Server => private IP:%s" % instance.private_ips[0])
+        self.logger.debug("Create Server => Private IP:%s" % instance.private_ips[0])
         server['floating_ip'] = instance.public_ips[0]
+        self.logger.debug("Create Server => Public IP:%s" % instance.public_ips[0])
 
         # CPU, Memory, Disk
         if req.has_key('package'):
@@ -121,9 +136,91 @@ class JoyentDriver(Manager):
                 server['memory'] = package['memory']
                 server['disk'] = package['disk']
 
+        self.logger.debug("status:%s" % instance.status())
+        self.logger.debug("status:%s" % instance.state)
+
         return server
 
     def discoverServer(self, auth, zone_id, req):
+        """
+         @param : auth
+            {"auth":{
+               "key_id":"Key ID",
+               "secret":"Secret Key",
+                }
+            }
+        @param: zone_id
+        @param: req (Dic)
+            {"server_id":"xxx-xxxx-xxx"}
+            {"name":"server_name"}
+        """
+        # 1. Get Endpoint of Zone
+        cloudMgr = self.locator.getManager('CloudManager')
+        (r_name, z_name) = cloudMgr._getRegionZone(zone_id)
+
+        auth_data = auth['auth']
+        a_key = auth_data['key_id']
+        s_key = auth_data['secret']
+
+        # 2. Create DataCenter object
+        sdc = DataCenter(location=z_name, key_id=a_key, secret=s_key)
+
+        if req.has_key('server_id'):
+            mid = req['server_id']
+            machine = sdc.machine(machine_id=mid)
+            dic = {}
+            dic['server_id'] = machine.id
+            dic['private_ip_address'] = machine.private_ips[0]
+            if len(machine.public_ips) >= 1:
+                dic['floating_ip'] = machine.public_ips[0]
+            dic['status'] = machine.status()
+            return dic
+        elif req.has_key('name'):
+            my_name = req['name']
+            machines = sdc.machines(name=my_name)
+            dic = {}
+            if len(machines) != 1:
+                # Error or ?
+                return dic
+            machine = machines[0]
+            dic['server_id'] = machine.id
+            dic['private_ip_address'] = machine.private_ips[0]
+            if len(machine.public_ips) >= 1:
+                dic['floating_ip'] = machine.public_ips[0]
+            dic['status'] = machine.state
+            return dic
+
+    def discoverServers(self, auth, zone_id):
+        """
+        find all servers at zone
+        @return: list of server info
+        """
+        # 1. Get Endpoint of Zone
+        cloudMgr = self.locator.getManager('CloudManager')
+        (r_name, z_name) = cloudMgr._getRegionZone(zone_id)
+
+        auth_data = auth['auth']
+        a_key = auth_data['key_id']
+        s_key = auth_data['secret']
+
+        # 2. Create DataCenter object
+        sdc = DataCenter(location=z_name, key_id=a_key, secret=s_key)
+        machines = sdc.machines()
+        output = []
+        for machine in machines:
+            dic = {}
+            dic['name'] = machine.name
+            dic['server_id'] = machine.id
+            dic['private_ip_address'] = machine.private_ips[0]
+            if len(machine.public_ips) >= 1:
+                dic['floating_ip'] = machine.public_ips[0]
+            dic['status'] = machine.state
+            # Register Machine
+            output.append(dic)
+
+        return output
+
+    def stopServer(self, auth, zone_id, req):
         """
          @param : auth
             {"auth":{
@@ -149,13 +246,55 @@ class JoyentDriver(Manager):
         if req.has_key('server_id'):
             mid = req['server_id']
             machine = sdc.machine(machine_id=mid)
+            # Stop Machine
+            machine.stop()
+            # Wait state
+            machine.poll_until('stopped')
             dic = {}
-            dic['server_id'] = machine.id
-            dic['private_ip_address'] = machine.ips[0]
-            if machine.ips.len() >= 2:
-                dic['floating_ip'] = machine.ips[1]
             dic['status'] = machine.state
             return dic
+
+    def deleteServer(self, auth, zone_id, req):
+        """
+         @param : auth
+            {"auth":{
+               "key_id":"Key ID",
+               "secret":"Secret Key",
+                }
+            }
+        @param: zone_id
+        @param: req (Dic)
+            {"server_id":"xxx-xxxx-xxx"}
+        """
+        # 1. Get Endpoint of Zone
+        cloudMgr = self.locator.getManager('CloudManager')
+        (r_name, z_name) = cloudMgr._getRegionZone(zone_id)
+
+        auth_data = auth['auth']
+        a_key = auth_data['key_id']
+        s_key = auth_data['secret']
+
+        # 2. Create DataCenter object
+        sdc = DataCenter(location=z_name, key_id=a_key, secret=s_key)
+
+        if req.has_key('server_id'):
+            mid = req['server_id']
+            try:
+                machine = sdc.machine(machine_id=mid)
+                # Stop Machine
+                machine.stop()
+                # Wait state
+                machine.poll_until('stopped')
+
+                # Delete Machine
+                machine.delete()
+                dic = {}
+                dic['status'] = machine.state
+                return dic
+            except:
+                self.logger.error("Server does not exist:%s" % mid)
+                return {}
+
 
     def getServerStatus(self, auth, zone_id, server_id):
         return {'status':'running'}

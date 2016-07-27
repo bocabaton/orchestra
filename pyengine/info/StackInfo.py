@@ -12,6 +12,7 @@ class StackInfo(VOInfo):
 
     def fetchByVO(self):
         self.output['stack_id'] = self.vo.stack_id
+        self.output['name'] = self.vo.name
         self.output['package_id'] = self.vo.package_id
         self.output['env'] = json.loads(self.vo.env)
         self.output['state'] = self.vo.state

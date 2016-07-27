@@ -16,7 +16,7 @@ class AwsDriver(Manager):
 
     GLOBAL_CONF = config.getGlobalConfig()
 
-    def discover(self, param):
+    def discover(self, param, ctx):
         """
         @param: 
             "auth":{
@@ -157,6 +157,9 @@ class AwsDriver(Manager):
         instances = ec2.create_instances(**req)
         # We support only one instance
         instance = instances[0]
+        instance.wait_until_running()
+        instance.reload()
+
         instance_info = {
             "ami_launch_index": instance.ami_launch_index,
             "architecture": instance.architecture,
@@ -198,6 +201,11 @@ class AwsDriver(Manager):
         server['server_id'] = instance_info['instance_id']
         #server['private_ip_address'] = instance_info['private_ip_address']
         self.logger.debug("Create Server => private IP:%s" % instance_info['private_ip_address'])
+
+        # CPU, Memory, Disk
+        # based on instance_type, get cpu, memory, disk size manaually
+        # notice: There are no API for get CPU, Memory, Disk
+
         return server
 
     def getServerStatus(self, auth, zone_id, server_id):

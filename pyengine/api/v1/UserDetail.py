@@ -7,11 +7,12 @@ class UserDetail(Command):
     # Request Parameter Info 
     req_params = {
         'user_id': ('r', 'str'),
-        'platform': ('r', 'str'),
+        'platform': ('o', 'str'),
         'add': ('o', 'dic'),
         'get': ('o', 'str'),
         'update': ('o', 'dic'),
         'delete': ('o', 'str'),
+        'list': ('o', 'str'),
     }
     
     def __init__(self, api_request):
@@ -30,5 +31,10 @@ class UserDetail(Command):
         elif self.params.has_key('delete'):
             info = mgr.deleteUserInfo(self.params)
             return info
+        elif self.params.has_key('list'):
+            """
+            {'list':''}
+            """
+            info = mgr.listUserInfo(self.params)
 
         return info
