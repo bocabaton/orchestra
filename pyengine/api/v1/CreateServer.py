@@ -30,6 +30,6 @@ class CreateServer(Command):
             info = mgr.createServer(self.params, ctx)
 
         e_mgr = self.locator.getManager('EventManager')
-        e_mgr.addEvent(self.user_meta['user_id'], 'Create Server(%s)' % info.output['name'])
+        e_mgr.addEvent(self.user_meta['user_id'], 'Create Server(%s) at Zone(%s)' % (info.output['name'],info.output['zone_id']))
 
         return info.result()

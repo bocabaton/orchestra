@@ -29,13 +29,14 @@ import logging
 LOG = logging.getLogger(__name__)
 
 class PyengineBpmnWorkflow(BpmnWorkflow):
-    def __init__(self, workflow_spec, workflow_id, stack_id, **kwargs):
+    def __init__(self, workflow_spec, workflow_id, stack_id, ctx, **kwargs):
         """
         constructor
         """
         super(PyengineBpmnWorkflow, self).__init__(workflow_spec, name=workflow_id, script_engine=None, read_only=False, **kwargs)
         self.stack_id = stack_id
         self.workflow_id = workflow_id
+        self.ctx = ctx
 
 class ServiceTask(Simple, BpmnSpecMixin, Manager):
     """
@@ -59,6 +60,7 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
         meta_url = 'http://127.0.0.1/api/v1/catalog/stacks/%s/env' % task.workflow.stack_id
         workflow_id = task.workflow.name
         stack_id = task.workflow.stack_id
+        user_id = task.workflow.ctx['user_id']
 
         # Change state (ready -> running)
         p_mgr = self.locator.getManager('PackageManager')
@@ -69,8 +71,9 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
         task_info = mgr.getTaskByName(workflow_id, task.get_description())
         self.logger.debug(task_info.output['task_uri'])
         ttype = task_info.output['task_type']
-        self.logger.debug("Task type:%s" % ttype)
         (cmd_type, group) = self._parseTaskType(ttype)
+        self.logger.debug("Task cmd type:%s" % cmd_type)
+        self.logger.debug("Task group:%s" % group)
         if group == 'localhost' and cmd_type == 'jeju':
             # every jeju has 'METADATA' keyword for metadata put/get
             kv = "METADATA=%s," % meta_url
@@ -84,6 +87,21 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
             cmd = '/usr/local/bin/jeju -m %s -k %s' % (task_info.output['task_uri'], kv)
             self.logger.debug('[%s] cmd: %s' % (group, cmd)) 
             os.system(cmd)
+
+        # WARN: group is list
+        elif group[0] == '${ZONE_ID}' and cmd_type == 'docker-compose':
+            # Call DockerCompose Driver at proper zone
+            dcMgr = self.locator.getManager('DockerComposeDriver')
+            template = task_info.output['task_uri']
+            self.logger.debug("Compose template:%s" % template)
+            kv = self._getKV2(stack_id, 'compose')
+            self.logger.debug(kv)
+            self.logger.debug("user_id:%s" % user_id)
+            dcMgr.run(template, {'docker-compose':kv}, stack_id, task.workflow.ctx)
+
+            #env_str = self._getKV2(stack_id, 'docker-compose')
+            #self.logger.debug("docker-env:%s" % env_str)
+            #dcMgr.execute()
 
         else:
             # group is list
@@ -124,7 +142,7 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
                 ex) jeju+cluster1,cluster2
         @return: (cmd type, node group)
         """
-        items = ttype.split("+")
+        items = ttype.split("@")
         if len(items) >= 2:
             glist = items[1].split(",")
             return(items[0], glist)
@@ -173,6 +191,7 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
             output = output + "%s=%s," % (key, value)
         self.logger.debug(output)
         return output
+
 
     def _getKV2(self, stack_id, key):
         """
@@ -238,9 +257,9 @@ class BpmnDriver(Manager):
 
     GLOBAL_CONF = config.getGlobalConfig()
 
-    def set_up(self, path, name, workflow_id, stack_id):
+    def set_up(self, path, name, workflow_id, stack_id, ctx):
         self.spec = self.load_spec(path, name)
-        self.workflow = PyengineBpmnWorkflow(self.spec, workflow_id=workflow_id, stack_id=stack_id)
+        self.workflow = PyengineBpmnWorkflow(self.spec, workflow_id=workflow_id, stack_id=stack_id, ctx=ctx)
         #self.run_engine()
 
     def create_workflow(self):
@@ -286,7 +305,7 @@ class BpmnDriver(Manager):
 
         # TODO: update name from server
         wf_name = 'Process_1'
-        self.set_up(new_path, wf_name, workflow_id, stack_id)
+        self.set_up(new_path, wf_name, workflow_id, stack_id, ctx)
 
         # 2. Run BPMN
         self.run_engine()

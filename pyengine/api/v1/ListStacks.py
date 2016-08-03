@@ -52,6 +52,10 @@ class ListStacks(Command):
                 mgr = self.locator.getManager('PortfolioManager')
                 portfolio_info = mgr.getPortfolio(param)
                 detail['portfolio'] = portfolio_info.result()
+                # Servers
+                cMgr = self.locator.getManager('CloudManager')
+                detail['servers'] = cMgr.listServersByStackID(result['stack_id'])
+
                 result.update({'detail':detail})
             response['results'].append(result)
 

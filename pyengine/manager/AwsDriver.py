@@ -61,6 +61,13 @@ class AwsDriver(Manager):
                          'region_id': region_info.output['region_id'],
                          'zone_type': 'aws'}
                 zone_info = cloudMgr.createZone(param)
+                zone_id = zone_info.output['zone_id']
+ 
+                # Discover ALL servers and register them
+                servers = self.discoverServers({'auth':auth}, zone_id)
+                for server in servers:
+                    cloudMgr.registerServerByServerInfo(zone_id, server, ctx)
+
 
         # return Zones
         return (output, total_count)
@@ -201,12 +208,95 @@ class AwsDriver(Manager):
         server['server_id'] = instance_info['instance_id']
         #server['private_ip_address'] = instance_info['private_ip_address']
         self.logger.debug("Create Server => private IP:%s" % instance_info['private_ip_address'])
+        server['status'] = instance_info['state']['Name']
 
         # CPU, Memory, Disk
         # based on instance_type, get cpu, memory, disk size manaually
         # notice: There are no API for get CPU, Memory, Disk
 
         return server
+
+    def updateName(self, auth, zone_id, server_id, name):
+        # 1. Get Endpoint of Zone
+        cloudMgr = self.locator.getManager('CloudManager')
+        (r_name, z_name) = cloudMgr._getRegionZone(zone_id)
+
+        s_info = cloudMgr.getServerInfo(server_id)
+        #Assume server_id is always existing
+        cloud_id = s_info['server_id']
+
+        auth_data = auth['auth']
+        a_key = auth_data['access_key_id']
+        sa_key = auth_data['secret_access_key']
+
+        # 2. Create EC2 session
+        session = Session(aws_access_key_id=a_key, aws_secret_access_key=sa_key, region_name=r_name)
+        ec2 = session.resource('ec2')
+        ec2.create_tags(Resources = [cloud_id], Tags = [{'Key':'Name','Value':name}])
+
+        
+    def discoverServer(self, auth, zone_id, req):
+        """
+         @param : auth
+            {"auth":{
+               "access_key_id":"ACCESS Key ID",
+               "secret_access_key":"Secret Access Key",
+                }
+            }
+        @param: zone_id
+        @param: req (Dic)
+            {"server_id":"xxx-xxxx-xxx"}
+            {"name":"server_name"}
+        """
+        # 1. Get Endpoint of Zone
+        cloudMgr = self.locator.getManager('CloudManager')
+        (r_name, z_name) = cloudMgr._getRegionZone(zone_id)
+
+        auth_data = auth['auth']
+        a_key = auth_data['access_key_id']
+        sa_key = auth_data['secret_access_key']
+
+        # 2. Create EC2 session
+        session = Session(aws_access_key_id=a_key, aws_secret_access_key=sa_key, region_name=r_name)
+        ec2 = session.resource('ec2')
+
+        #TODO
+    def discoverServers(self, auth, zone_id):
+        """
+        find all servers at zone
+        @return: list of server info
+        """
+        # 1. Get Endpoint of Zone
+        cloudMgr = self.locator.getManager('CloudManager')
+        (r_name, z_name) = cloudMgr._getRegionZone(zone_id)
+
+        auth_data = auth['auth']
+        a_key = auth_data['access_key_id']
+        sa_key = auth_data['secret_access_key']
+
+        # 2. Create EC2 session
+        session = Session(aws_access_key_id=a_key, aws_secret_access_key=sa_key, region_name=r_name)
+        ec2 = session.resource('ec2')
+
+        machines = ec2.instances.filter(Filters=[{'Name':'availability-zone','Values':[z_name]}])
+        output = []
+        for machine in machines:
+            dic = {}
+            dic['name'] = ''
+            if machine.tags:
+                for tag in machine.tags:
+                    if tag['Key'] == 'Name':
+                        dic['name'] = tag['Value']
+                        break
+            dic['server_id'] = machine.instance_id
+            dic['private_ip_address'] = machine.private_ip_address
+            dic['floating_ip'] = machine.public_ip_address
+            dic['status'] = machine.state['Name']
+            # Register Machine
+            output.append(dic)
+
+        return output
+
 
     def getServerStatus(self, auth, zone_id, server_id):
         """

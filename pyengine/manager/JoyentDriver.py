@@ -137,7 +137,6 @@ class JoyentDriver(Manager):
                 server['disk'] = package['disk']
 
         self.logger.debug("status:%s" % instance.status())
-        self.logger.debug("status:%s" % instance.state)
 
         return server
 
@@ -174,10 +173,20 @@ class JoyentDriver(Manager):
             if len(machine.public_ips) >= 1:
                 dic['floating_ip'] = machine.public_ips[0]
             dic['status'] = machine.status()
+            # CPU, Memory, Disk
+            if machine.has_key('package'):
+                packages = sdc.packages(machine['package'])
+                if len(packages) == 1:
+                    package = packages[0]
+                    dic['cpus'] = package['vcpus']
+                    dic['memory'] = package['memory']
+                    dic['disk'] = package['disk']
             return dic
+
         elif req.has_key('name'):
             my_name = req['name']
             machines = sdc.machines(name=my_name)
+            self.logger.debug("Detected machine is %s" % len(machines))
             dic = {}
             if len(machines) != 1:
                 # Error or ?
@@ -187,9 +196,18 @@ class JoyentDriver(Manager):
             dic['private_ip_address'] = machine.private_ips[0]
             if len(machine.public_ips) >= 1:
                 dic['floating_ip'] = machine.public_ips[0]
-            dic['status'] = machine.state
+            dic['status'] = machine.status()
+            # CPU, Memory, Disk
+            #if machine.has_key('package'):
+            #    packages = sdc.packages(machine['package'])
+            #    if len(packages) == 1:
+            #        package = packages[0]
+            #        dic['cpus'] = package['vcpus']
+            #        dic['memory'] = package['memory']
+            #        dic['disk'] = package['disk']
             return dic
-
+        self.logger.error("No Server founded:%s" % z_name)
+ 
     def discoverServers(self, auth, zone_id):
         """
         find all servers at zone

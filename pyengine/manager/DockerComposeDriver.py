@@ -972,6 +972,15 @@ def exit_if(condition, message, exit_code):
 
 class DockerComposeDriver(Manager):
     GLOBAL_CONF = config.getGlobalConfig()
+    def execute(self, template, ):
+        """
+        Params:
+            template: url of template
+            env:
+            stack_id:
+            ctx:
+        """
+        pass
 
     def run(self, template, env, stack_id, ctx):
         """
@@ -1045,9 +1054,8 @@ class DockerComposeDriver(Manager):
         c1_key = set(c1.keys())
         insts = c2_key - c1_key
         self.logger.debug(insts)
-        
-        #platform =cloudMgr._getZonePlatform(zone_id)
-        platform = "joyent"
+
+        platform =cloudMgr._getZonePlatform(zone_id)
         self.logger.debug("Platform :%s" % platform)
         # if docker-swarm, call DockerDriver
         if platform == "docker":
@@ -1055,7 +1063,7 @@ class DockerComposeDriver(Manager):
         # if joyent, call JoyentDriver
         elif platform == "joyent":
             for inst in insts:
-                self.logger.debug("Find server name=%s" % inst)
+                self.logger.debug("Register server name=%s" % inst)
                 p = {'zone_id': zone_id,
                         'name':inst,
                         'floatingIP':False,

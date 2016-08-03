@@ -233,7 +233,7 @@ class CloudManager(Manager):
         """
         param = {'zone_id':zone_id}
         zone_info = self.getZone(param)
-        return zone_info.output['platform']
+        return zone_info.output['zone_type']
  
     def _getRegionZone(self, zone_id):
         """
@@ -246,7 +246,24 @@ class CloudManager(Manager):
         region_info = self.getRegion(param)
         return (region_info.output['name'], zone_info.output['name'])
 
-        
+    def syncZone(self, params, ctx=None):
+        """ sync server information
+
+        Param:
+            params: {'zone_id':'xxxxx'}
+            ctx: {'user_id':'xxxx'}
+        Return:
+        """
+        # List Servers at zone (A)
+
+        # Discover Servers at zone (B)
+
+        # Add Servers (B-A)
+
+        # Change state (A-B)
+
+        # Return servers at zone
+ 
     ###########################################
     # Cloud Discover
     ###########################################
@@ -442,6 +459,7 @@ class CloudManager(Manager):
         """
         req=params['request']
         discovered_server = driver.discoverServer(auth, zone_id, req)
+        self.logger.debug("Discovered server:%s" % discovered_server)
  
         # Update server_info
         # Detect server information
@@ -462,6 +480,12 @@ class CloudManager(Manager):
         if params.has_key('stack_id') == True:
             self.updateServerInfo(server.server_id, 'stack_id', params['stack_id'])
 
+        ##########################
+        # Update Server state
+        ##########################
+        if discovered_server.has_key('status'):
+            self.logger.debug("Update Server status:%s" % discovered_server['status'])
+            server = self.updateServer(server.server_id, 'status', discovered_server['status'])
 
         return self.locator.getInfo('ServerInfo', server)
 
@@ -538,7 +562,20 @@ class CloudManager(Manager):
         zone_id = params['zone_id']
         req = params['request']
         created_server = driver.deployServer(auth, zone_id, req)
+
         self.updateServerInfo(server.server_id, 'server_id', created_server['server_id'])
+
+        ############################################
+        # Post-processing
+        # Specific operations based on cloud type
+        ############################################
+        if platform == "aws":
+            # AWS cannot specify instance name.
+            driver.updateName(auth, zone_id, server.server_id, params['name'])
+
+        ############################
+        # Update server_info table
+        ############################
         # Update Private IP address
         if created_server.has_key('private_ip_address'):
             self.updateServerInfo(server.server_id, 'private_ip_address', created_server['private_ip_address'])
@@ -631,6 +668,7 @@ class CloudManager(Manager):
         update server table field=key, value=value
         @return: server dao
         """
+        self.logger.debug("Update Server at %s,%s=%s" % (server_id, key, value))
         server_dao = self.locator.getDAO('server')
         dic = {}
         dic[key] = value
@@ -675,6 +713,19 @@ class CloudManager(Manager):
                 return {key: items[key]}
         return {}
 
+    def listServersByStackID(self, stack_id):
+        """
+        Return: list of server_id
+        """
+        dao = self.locator.getDAO('server_info')
+        search = [{'key':'key','value':'stack_id','option':'eq'},
+                {'key':'value','value':stack_id, 'option':'eq'}]
+        (infos, total_count) = dao.select(search=search)
+        s_list = []
+        for info in infos:
+            s_list.append(info.server_id.urn[9:])
+        return s_list
+
     def listServers(self, search, brief=False):
         server_dao = self.locator.getDAO('server')
 
@@ -690,7 +741,6 @@ class CloudManager(Manager):
             output.append(server_info)
 
         return (output, total_count)
-
 
     def getServerBrief(self, params):
         """

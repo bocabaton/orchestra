@@ -82,10 +82,18 @@ class stack(models.Model):
     name = models.CharField(max_length=255, default='')
     package = models.ForeignKey('package', to_field='package_id', null=False)
     env = models.CharField(max_length=10240, null=True)
-    state = models.CharField(max_length=20, default='builing')
+    state = models.CharField(max_length=20, default='building')
     created = models.DateTimeField(auto_now_add=True, editable=False)
     user = models.ForeignKey('user', to_field='user_id')
  
+class stack_detail(models.Model):
+    uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
+    product = models.ForeignKey('stack', to_field='stack_id', null=False)
+    key = models.CharField(max_length=128, null=True)
+    value = models.CharField(max_length=256, null=True)
+    tag = models.CharField(max_length=256, null=True, default='')
+
+
 ############
 # Workflow
 ############

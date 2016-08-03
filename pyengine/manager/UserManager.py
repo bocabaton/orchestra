@@ -261,6 +261,7 @@ class UserManager(Manager):
                 break
             else:
                 self.logger.warning("Fail to get joyent ca.pem from %s" % i)
+        os.chmod(ca_path, 0400)
 
         # Update key.pem
         key_path = "%s/key.pem" % docker_dir
@@ -276,12 +277,14 @@ class UserManager(Manager):
         cmd = "openssl req -new -key %s -out %s -subj \"/CN=%s\"" % (key_path, csr_path, j_account)
         self.logger.debug("Execute:%s" % cmd)
         os.system(cmd)
+        os.chmod(csr_path, 0400)
 
         # Create cert.pem
         cert_path = "%s/cert.pem" % docker_dir
         cmd = "openssl x509 -req -days 365 -in %s -signkey %s -out %s" % (csr_path, key_path, cert_path)
         self.logger.debug("Execute:%s" % cmd)
         os.system(cmd)
+        os.chmod(cert_path, 0400)
 
         # Register to DB
         p = {'user_id':user_id, 'add': {'DOCKER_CERT_PATH':docker_dir}, 'platform':'docker'}
