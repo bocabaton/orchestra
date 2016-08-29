@@ -5,10 +5,8 @@ class ListPortfolios(Command):
 
     # Request Parameter Info
     req_params = {
-        'search': ('o', 'list'),
-        'search_or': ('o', 'list'),
-        'sort': ('o', 'dic'),
-        'page': ('o', 'dic'),
+        'name': ('o', 'str'),
+        'owner': ('o', 'str'),
     }
     
     def __init__(self, api_request):

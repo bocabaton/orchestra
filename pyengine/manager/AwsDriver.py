@@ -297,6 +297,74 @@ class AwsDriver(Manager):
 
         return output
 
+    def stopServer(self, auth, zone_id, req):
+        """
+         @param : auth
+            {"auth":{
+               "key_id":"Key ID",
+               "secret":"Secret Key",
+                }
+            }
+        @param: zone_id
+        @param: req (Dic)
+            {"server_id":"xxx-xxxx-xxx"}
+        """
+        # 1. Get Endpoint of Zone
+        cloudMgr = self.locator.getManager('CloudManager')
+        (r_name, z_name) = cloudMgr._getRegionZone(zone_id)
+
+        auth_data = auth['auth']
+        a_key = auth_data['access_key_id']
+        sa_key = auth_data['secret_access_key']
+
+        # 2. Create EC2 session
+        session = Session(aws_access_key_id=a_key, aws_secret_access_key=sa_key, region_name=r_name)
+        ec2 = session.resource('ec2')
+
+        if req.has_key('server_id') == True:
+            mid = req['server_id']
+            machines = ec2.instances.filter(InstanceIds=[mid]).stop()
+            for machine in machines:
+                dic = {}
+                dic['status'] = machine.state['Name']
+                return dic
+        # This is error
+        return {}
+
+    def deleteServer(self, auth, zone_id, req):
+        """
+         @param : auth
+            {"auth":{
+               "key_id":"Key ID",
+               "secret":"Secret Key",
+                }
+            }
+        @param: zone_id
+        @param: req (Dic)
+            {"server_id":"xxx-xxxx-xxx"}
+        """
+        # 1. Get Endpoint of Zone
+        cloudMgr = self.locator.getManager('CloudManager')
+        (r_name, z_name) = cloudMgr._getRegionZone(zone_id)
+
+        auth_data = auth['auth']
+        a_key = auth_data['access_key_id']
+        sa_key = auth_data['secret_access_key']
+
+        # 2. Create EC2 session
+        session = Session(aws_access_key_id=a_key, aws_secret_access_key=sa_key, region_name=r_name)
+        ec2 = session.resource('ec2')
+
+        if req.has_key('server_id'):
+            mid = req['server_id']
+            machines = ec2.instances.filter(InstanceIds=[mid]).terminate()
+            for machine in machines:
+                dic = {}
+                dic['status'] = machine.state['Name']
+                return dic
+        # This is error
+        return {}
+
 
     def getServerStatus(self, auth, zone_id, server_id):
         """

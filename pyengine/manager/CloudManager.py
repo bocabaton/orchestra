@@ -222,6 +222,7 @@ class CloudManager(Manager):
         """
         dao = self.locator.getDAO('zone_detail')
         details = dao.getVOfromKey(zone_id=zone_id)
+        self.logger.debug("_getZoneDetail(%s):%d\n" % (zone_id,  len(details)))
         dic = {}
         for detail in details:
             dic[detail.key] = detail.value
@@ -726,6 +727,23 @@ class CloudManager(Manager):
             s_list.append(info.server_id.urn[9:])
         return s_list
 
+    def listServerNamesByStackID(self, stack_id):
+        """
+        Return: list of server_id
+        """
+        dao = self.locator.getDAO('server_info')
+        search = [{'key':'key','value':'stack_id','option':'eq'},
+                {'key':'value','value':stack_id, 'option':'eq'}]
+        (infos, total_count) = dao.select(search=search)
+        s_list = []
+        s_dao = self.locator.getDAO('server')
+        for info in infos:
+            search = [{'key':'server_id', 'value':info.server_id, 'option':'eq'}]
+            (ss,tc) = s_dao.select(search=search)
+            s_list.append(ss[0].name)
+        return s_list
+
+
     def listServers(self, search, brief=False):
         server_dao = self.locator.getDAO('server')
 
@@ -845,13 +863,16 @@ class CloudManager(Manager):
     def executeCmd(self, params):
 
         # Connect to Node using ssh (ip, user_id, password )
-        TRY_COUNT=5
+        TRY_COUNT=10
+        tf = False
         for i in range(TRY_COUNT):
             (tf, ssh, user_id) = self._makeSSHClient(params)
+            self.logger.debug("[%d] SSH status(%s), user(%s)" % (i, tf, user_id))
             if tf == True:
+                self.logger.debug("SSH connection success")
                 break
-            self.logger.info("Failed to connect, try again(%s)" % i+1)
-            time.sleep(30)
+            self.logger.error("Failed to connect, try again(%d)" % i)
+            time.sleep(10)
 
         if tf == False:
             return {"error": ssh}
@@ -870,6 +891,7 @@ class CloudManager(Manager):
 
     def _makeSSHClient(self, params):
         # extract information for ssh
+        self.logger.debug("_makeSSHClient")
         server_info = self.getServerInfo(params['server_id'])
         
         if server_info.has_key('floatingip'):
@@ -978,10 +1000,10 @@ class CloudManager(Manager):
                 connected = False
 
         if connected == False:
-            self.logger.debug(err_msg)
-            return (False, "Can not connect", user_id)
+            self.logger.debug("%s: err_msg" % connected)
+            return (connected, "Can not connect", user_id)
 
-        return (True, ssh, user_id)
+        return (connected, ssh, user_id)
 
     def _getDriver(self, zone_id):
         """

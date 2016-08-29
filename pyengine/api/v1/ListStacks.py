@@ -55,7 +55,7 @@ class ListStacks(Command):
                 # Servers
                 cMgr = self.locator.getManager('CloudManager')
                 detail['servers'] = cMgr.listServersByStackID(result['stack_id'])
-
+                detail['server_names'] = cMgr.listServerNamesByStackID(result['stack_id'])
                 result.update({'detail':detail})
             response['results'].append(result)
 

@@ -1002,23 +1002,23 @@ class DockerComposeDriver(Manager):
 
         """
         env
-        {'docker-compose':{'ZONE_ID':'xxxx'}}
+        {'compose':{'ZONE_ID':'xxxx'}}
         """
         # Fetch DOCKER environment from zone and user info
-        if env.has_key('docker-compose') == False:
+        if env.has_key('compose') == False:
             # TODO: update ERROR msg
             raise ERROR_INVALID_PARAMETER(key='env', value=env)
-        my_env = env['docker-compose']
+        my_env = env['compose']
         if my_env.has_key('ZONE_ID') == False:
             # TODO: update ERROR msg
             raise ERROR_INVALID_PARAMETER(key='ZONE_ID', value=my_env)
 
-        zone_id = env['docker-compose']['ZONE_ID']
+        zone_id = env['compose']['ZONE_ID']
         cloudMgr = self.locator.getManager('CloudManager')
         docker_info = cloudMgr._getZoneDetail(zone_id)
         
         # USE env as docker-compose environments
-        docker_info.update(env['docker-compose'])
+        docker_info.update(env['compose'])
 
         # Get DOCKER_CERT_PATH if possible
         uMgr = self.locator.getManager('UserManager')

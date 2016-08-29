@@ -6,7 +6,8 @@ class ZoneDetail(Command):
 
     # Request Parameter Info 
     req_params = {
-        'create': ('o', 'dic'),
+        'zone_id': ('r', 'str'),
+        'create': ('o', 'list'),
         'get': ('o', 'str'),
         'delete': ('o', 'str')
     }
@@ -18,6 +19,6 @@ class ZoneDetail(Command):
         mgr = self.locator.getManager('CloudManager')
 
         if self.params.has_key('create'):
-            info = mgr.CreateZoneDetail(self.params['create'])
+            info = mgr.createZoneDetail(self.params)
         
         return info.result()

@@ -84,7 +84,7 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
             if kv[-1] == ",":
                 kv = kv[:-1]
             self.logger.debug(kv)
-            cmd = '/usr/local/bin/jeju -m %s -k %s' % (task_info.output['task_uri'], kv)
+            cmd = '/usr/local/bin/jeju -m %s -L /tmp/jeju.log -k %s' % (task_info.output['task_uri'], kv)
             self.logger.debug('[%s] cmd: %s' % (group, cmd)) 
             os.system(cmd)
 
@@ -119,7 +119,7 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
                         # Filter last character
                         if kv[-1]==",":
                             kv = kv[:-1]
-                        cmd = '/usr/local/bin/jeju -m %s -k %s' % (task_info.output['task_uri'], kv)
+                        cmd = '/usr/local/bin/jeju -m %s -L /tmp/jeju.log -k %s' % (task_info.output['task_uri'], kv)
                     elif cmd_type == 'ssh':
                         cmd = task_info.output['task_uri']
 
@@ -137,9 +137,9 @@ class ServiceTask(Simple, BpmnSpecMixin, Manager):
     def _parseTaskType(self, ttype):
         """
         @params:
-            - ttask: task type string (cmd type + node group)
-                ex) jeju, jeju+cluster, ssh+node1 ...
-                ex) jeju+cluster1,cluster2
+            - ttask: task type string (cmd type @ node group)
+                ex) jeju, jeju@cluster, ssh@node1 ...
+                ex) jeju@cluster1,cluster2
         @return: (cmd type, node group)
         """
         items = ttype.split("@")
@@ -299,6 +299,7 @@ class BpmnDriver(Manager):
         # Save as working directory
         new_path = self._saveTemp(job)
         # Get workflow_id
+        self.logger.debug("################### 1. Prepare workflow ########################")
         w_mgr = self.locator.getManager('WorkflowManager')
         workflow_id  = w_mgr.getWorkflowId(template, template_type = 'bpmn') 
         self.logger.debug("### Workflow ID:%s" % workflow_id)
@@ -308,9 +309,11 @@ class BpmnDriver(Manager):
         self.set_up(new_path, wf_name, workflow_id, stack_id, ctx)
 
         # 2. Run BPMN
+        self.logger.debug("#################### 2. start workflow engine ##################")
         self.run_engine()
 
         # 3. Update Stack state
+        self.logger.debug("#################### 3. end workflow update   ##################")
         p_mgr = self.locator.getManager('PackageManager')
         p_mgr.updateStackState(stack_id, "running")
    
@@ -337,6 +340,7 @@ class BpmnDriver(Manager):
         """
         SAVE_DIR = '/tmp'
         new_path = '%s/%s' % (SAVE_DIR, uuid.uuid4())
+        self.logger.debug("Save workflow template : %s" % new_path)
         fp = open(new_path, 'w')
         fp.write(content)
         fp.close()

@@ -205,6 +205,25 @@ class PackageManager(Manager):
     def getStack(self, params):
         return self.getStackByID(params['stack_id'])
 
+    def deleteStack(self, params):
+        # TODO: Delete Servers first
+        stack_id = params['stack_id']
+        # 1. Find Instance related with stack
+        #    Delete instances
+        c_mgr = self.locator.getManager('CloudManager')
+        c_mgr.deleteServersByStackID(stack_id)
+        
+        # 2. Delete Stack DB
+        self._deleteStack(stack_id)
+        return {}
+
+    def _deleteStack(self, stack_id):
+        dao = self.locator.getDAO('stack')
+        stacks = dao.getVOfromKey(stack_id=stack_id)
+        if stacks.count() == 0:
+            raise ERROR_NOT_FOUND(key='stack_id', value=stack_id)
+        stacks.delete()
+
     def getStackByID(self, stack_id):
         dao = self.locator.getDAO('stack')
 
