@@ -142,6 +142,24 @@ class server_info(models.Model):
     key = models.CharField(max_length=128, null=True)
     value = models.CharField(max_length=2500, null=True)
 
+class vpc(models.Model):
+    name = models.CharField(max_length=20)
+    vpc_id = models.UUIDField(default=uuid.uuid4, unique=True)
+    cidr = models.CharField(max_length=20)
+    region = models.ForeignKey('region', to_field='region_id',null=False)
+
+class vpc_detail(models.Model):
+    vpc = models.ForeignKey('vpc', to_field='vpc_id', null=False)
+    key = models.CharField(max_length=128)
+    value = models.CharField(max_length=1024)
+
+class subnet(models.Model):
+    name = models.CharField(max_length=20)
+    subnet_id = models.UUIDField(default=uuid.uuid4, unique=True)
+    cidr = models.CharField(max_length=20)
+    vpc = models.ForeignKey('vpc', to_field='vpc_id',null=False)
+    zone = models.ForeignKey('zone', to_field='zone_id',null=False)
+
 
 #############
 # Event

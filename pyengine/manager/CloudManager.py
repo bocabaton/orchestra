@@ -172,6 +172,23 @@ class CloudManager(Manager):
 
         return self.locator.getInfo('ZoneInfo', zones[0])
 
+    def getZoneByName(self, name, region_id=None):
+        zone_dao = self.locator.getDAO('zone')
+
+        zones = zone_dao.getVOfromKey(name=name)
+
+        if zones.count() == 0:
+            raise ERROR_NOT_FOUND(key='name', value=name)
+
+        if region_id:
+            for zone in zones:
+                zone_info = self.locator.getInfo('ZoneInfo',zone)
+                if zone_info.output['region_id'] == region_id:
+                    return zone_info
+        else:
+            return self.locator.getInfo('RegionInfo', regions[0])
+
+
     def listZones(self, search):
         zone_dao = self.locator.getDAO('zone')
 
@@ -264,7 +281,68 @@ class CloudManager(Manager):
         # Change state (A-B)
 
         # Return servers at zone
- 
+
+    ##########################################
+    # VPC
+    ##########################################
+    def createVpc(self, params):
+        vpc_dao = self.locator.getDAO('vpc') 
+
+        if vpc_dao.isExist(name=params['name']):
+            return self.getVpcByName(params)
+            #raise ERROR_EXIST_RESOURCE(key='name', value=params['name'])
+
+        dic = {}
+        dic['name'] = params['name']
+        dic['cidr'] = params['cidr']
+        if params.has_key('region_id'):
+            region_dao = self.locator.getDAO('region')
+            regions = region_dao.getVOfromKey(region_id=params['region_id'])
+            if regions.count() == 0:
+                raise ERROR_INVALID_PARAMETER(key='region_id', value=params['region_id'])
+            dic['region'] = regions[0]
+
+
+        vpc = vpc_dao.insert(dic)
+
+        return self.locator.getInfo('VpcInfo', vpc)
+
+    def getVpcByName(self, params):
+        vpc_dao = self.locator.getDAO('vpc')
+
+        vpcs = vpc_dao.getVOfromKey(name=params['name'])
+
+        if vpcs.count() == 0:
+            raise ERROR_NOT_FOUND(key='name', value=params['name'])
+
+        return self.locator.getInfo('VpcInfo', vpcs[0])
+
+
+    def createSubnet(self, params):
+        subnet_dao = self.locator.getDAO('subnet') 
+
+        if subnet_dao.isExist(name=params['name']):
+            raise ERROR_EXIST_RESOURCE(key='name', value=params['name'])
+
+        dic = {}
+        dic['name'] = params['name']
+        dic['cidr'] = params['cidr']
+        vpc_dao = self.locator.getDAO('vpc')
+        vpcs = vpc_dao.getVOfromKey(vpc_id=params['vpc_id'])
+        if vpcs.count() == 0:
+            raise ERROR_INVALID_PARAMETER(key='vpc_id', value=params['vpc_id'])
+        dic['vpc'] = vpcs[0]
+        zone_dao = self.locator.getDAO('zone')
+        zones = zone_dao.getVOfromKey(zone_id=params['zone_id'])
+        if zones.count() == 0:
+            raise ERROR_INVALID_PARAMETER(key='zone_id', value=params['zone_id'])
+        dic['zone'] = zones[0]
+
+        subnet = subnet_dao.insert(dic)
+
+        return self.locator.getInfo('SubnetInfo', subnet)
+
+
     ###########################################
     # Cloud Discover
     ###########################################
@@ -392,7 +470,10 @@ class CloudManager(Manager):
             self.updateServerInfo(server.server_id, 'private_ip_address', discovered_server['private_ip_address'])
         if discovered_server.has_key('floating_ip'):
             self.updateServerInfo(server.server_id, 'floatingip', discovered_server['floating_ip'])
-
+        if discovered_server.has_key('VpcId'):
+            self.updateServerInfo(server.server_id, 'VpcId',discovered_server['VpcId'])
+        if discovered_server.has_key('SubnetId'):
+            self.updateServerInfo(server.server_id, 'SubnetId', discovered_server['SubnetId'])
 
         return self.locator.getInfo('ServerInfo', server)
 
@@ -461,7 +542,9 @@ class CloudManager(Manager):
         req=params['request']
         discovered_server = driver.discoverServer(auth, zone_id, req)
         self.logger.debug("Discovered server:%s" % discovered_server)
- 
+        if discovered_server == None:
+            self.logger.error("Server not found from cloud")
+            return self.locator.getInfo('ServerInfo', server)
         # Update server_info
         # Detect server information
         # params['request']
@@ -487,6 +570,11 @@ class CloudManager(Manager):
         if discovered_server.has_key('status'):
             self.logger.debug("Update Server status:%s" % discovered_server['status'])
             server = self.updateServer(server.server_id, 'status', discovered_server['status'])
+        if discovered_server.has_key('VpcId'):
+            self.updateServerInfo(server.server_id, 'VpcId',discovered_server['VpcId'])
+        if discovered_server.has_key('SubnetId'):
+            self.updateServerInfo(server.server_id, 'SubnetId', discovered_server['SubnetId'])
+
 
         return self.locator.getInfo('ServerInfo', server)
 

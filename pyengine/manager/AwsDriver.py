@@ -50,11 +50,17 @@ class AwsDriver(Manager):
         output = []
         total_count = 0
         for region in regions:
-            param = {'name':region}
-            region_info = cloudMgr.createRegion(param)
+            # Check Already Exist
+            try:
+                region_info = cloudMgr.getRegionByName({'name':region})
+            except ERROR_NOT_FOUND:
+                param = {'name':region}
+                region_info = cloudMgr.createRegion(param)
+            region_id = region_info.output['region_id']
             total_count = total_count + 1
             output.append(region_info)
-            # 2. Detect Availability Zones
+
+            # 1. Detect Availability Zones
             az_list = self.getAvailabilityZones(a_key, sa_key, region)
             for az in az_list:
                 param = {'name': az, 
@@ -67,7 +73,33 @@ class AwsDriver(Manager):
                 servers = self.discoverServers({'auth':auth}, zone_id)
                 for server in servers:
                     cloudMgr.registerServerByServerInfo(zone_id, server, ctx)
-
+	
+            # 2. Detect VPC
+            (tf, vpcs) = self.getAwsVpcs(a_key, sa_key, region)
+            if tf == True:
+                # loop all VPC
+                for vpc in vpcs:
+                    # Crete VPC
+                    name = self.findNameInTags(vpc)
+                    if name == None:
+                        name = vpc['VpcId']
+                    param = {'name':name, 'cidr':vpc['CidrBlock'],'region_id':region_id}
+                    vpc_info = cloudMgr.createVpc(param)
+                    vpc_id = vpc_info.output['vpc_id']
+                    # Find Subnets
+                    aws_vpc_id = vpc['VpcId']
+                    (tf, subnets) = self.getAwsSubnets(a_key, sa_key, region, aws_vpc_id)
+                    if tf == True:
+                        for subnet in subnets:
+                            # Create Subnet
+                            name = self.findNameInTags(subnet)
+                            if name == None:
+                                name = subnet['SubnetId']
+                            # find zone_id
+                            zone_info = cloudMgr.getZoneByName(subnet['AvailabilityZone'],region_id)
+                            zone_id = zone_info.output['zone_id']
+                            param = {'name':name, 'cidr':subnet['CidrBlock'],'vpc_id':vpc_id, 'zone_id':zone_id}
+                            subnet_info = cloudMgr.createSubnet(param)	
 
         # return Zones
         return (output, total_count)
@@ -129,7 +161,38 @@ class AwsDriver(Manager):
 
         return output
 
-
+    def getAwsVpcs(self, a_key, sa_key, r_name):
+        """
+        @params:
+            - a_key: access key id
+            - sa_key : secret access key
+            - region_name: Region name (ex. us-east-1)
+        """
+        self.logger.debug("Discover VPCs at %s" % r_name)
+        client = boto3.client('ec2',region_name=r_name, aws_access_key_id=a_key, aws_secret_access_key=sa_key)
+        myfilters = [{'Name':'state','Values':['available']}]
+        vpcs = client.describe_vpcs(DryRun=False, Filters=myfilters)
+        if vpcs.has_key('Vpcs'):
+            return (True, vpcs['Vpcs'])
+        else:
+            return (False, None)
+ 
+    def getAwsSubnets(self, a_key, sa_key, r_name, vpc_id):
+        """
+        @params:
+            - a_key: access key id
+            - sa_key : secret access key
+            - vpc_id: aws vpc_id
+        """
+        self.logger.debug("Discover Subnets at %s" % vpc_id)
+        client = boto3.client('ec2',region_name=r_name, aws_access_key_id=a_key, aws_secret_access_key=sa_key)
+        myfilters = [{'Name':'vpc-id','Values':[vpc_id]},{'Name':'state','Values':['available']}]
+        subnets = client.describe_subnets(DryRun=False, Filters=myfilters)
+        if subnets.has_key('Subnets'):
+            return (True, subnets['Subnets'])
+        else:
+            return (False, None)
+ 
     ###############################################
     # Deploy
     ###############################################
@@ -257,10 +320,36 @@ class AwsDriver(Manager):
         sa_key = auth_data['secret_access_key']
 
         # 2. Create EC2 session
-        session = Session(aws_access_key_id=a_key, aws_secret_access_key=sa_key, region_name=r_name)
-        ec2 = session.resource('ec2')
+        client = boto3.client('ec2',region_name=r_name, aws_access_key_id=a_key, aws_secret_access_key=sa_key)
+        if req.has_key('server_id'):
+            server_id = req['server_id']
+            res = client.describe_instances(InstanceIds=[server_id])
+        elif req.has_key('name'):
+            name = req['Name']
+            myfilter= [{'Name':'tag:Name','Values':[name]}]
+            res = client.describe_instances(Filters=myfilter)
+        if res.has_key('Reservations') and len(res['Reservations']) > 0:
+            machines = res['Reservations'][0]['Instances']
+            self.logger.debug("Num machines should 1 = (%d)" % len(machines))
+        else:
+            machines = []
+        for machine in machines:
+            dic = {}
+            name = self.findNameInTags(machine)
+            if name:
+                dic['name'] = name
+            else:
+                dic['name'] = machine['InstanceId']
+            dic['server_id'] = machine['InstanceId']
+            dic['ip_address'] = machine['PrivateIpAddress']
+            if machine.has_key('PublicIpAddress'):
+                dic['floating_ip'] = machine['PublicIpAddress']
+            dic['status'] = machine['State']['Name']
+            dic['SubnetId'] = machine['SubnetId']
+            dic['VpcId'] = machine['VpcId']
+            return dic
+        return None
 
-        #TODO
     def discoverServers(self, auth, zone_id):
         """
         find all servers at zone
@@ -275,23 +364,28 @@ class AwsDriver(Manager):
         sa_key = auth_data['secret_access_key']
 
         # 2. Create EC2 session
-        session = Session(aws_access_key_id=a_key, aws_secret_access_key=sa_key, region_name=r_name)
-        ec2 = session.resource('ec2')
-
-        machines = ec2.instances.filter(Filters=[{'Name':'availability-zone','Values':[z_name]}])
+        client = boto3.client('ec2',region_name=r_name, aws_access_key_id=a_key, aws_secret_access_key=sa_key)
+        myfilter = [{'Name':'availability-zone','Values':[z_name]}]
+        res = client.describe_instances(Filters=myfilter)
+        if res.has_key('Reservations') and len(res['Reservations']) > 0:
+            machines = res['Reservations'][0]['Instances']
+        else:
+            machines = []
         output = []
         for machine in machines:
             dic = {}
-            dic['name'] = ''
-            if machine.tags:
-                for tag in machine.tags:
-                    if tag['Key'] == 'Name':
-                        dic['name'] = tag['Value']
-                        break
-            dic['server_id'] = machine.instance_id
-            dic['private_ip_address'] = machine.private_ip_address
-            dic['floating_ip'] = machine.public_ip_address
-            dic['status'] = machine.state['Name']
+            name = self.findNameInTags(machine)
+            if name:
+                dic['name'] = name
+            else:
+                dic['name'] = machine['InstanceId']
+            dic['server_id'] = machine['InstanceId']
+            dic['ip_address'] = machine['PrivateIpAddress']
+            if machine.has_key('PublicIpAddress'):
+                dic['floating_ip'] = machine['PublicIpAddress']
+            dic['status'] = machine['State']['Name']
+            dic['SubnetId'] = machine['SubnetId']
+            dic['VpcId'] = machine['VpcId']
             # Register Machine
             output.append(dic)
 
@@ -363,8 +457,7 @@ class AwsDriver(Manager):
                 dic['status'] = machine.state['Name']
                 return dic
         # This is error
-        return {}
-
+        return {dic['status']:'not_found'}
 
     def getServerStatus(self, auth, zone_id, server_id):
         """
@@ -511,3 +604,29 @@ class AwsDriver(Manager):
 
             self.logger.info("Instance is not ready")
             time.sleep(10)
+
+
+    ##############
+    # AWS utils
+    ##############
+    def findNameInTags(self, dic):
+        """
+        find name in tags list
+        'Tags': [
+        {
+        'Key': 'Name',
+        'Value': 'string'
+        },
+        ],
+        """
+        if dic.has_key('Tags'):
+            tags = dic['Tags']
+        else:
+            return None
+        for dic in tags:
+            if dic['Key'] == 'Name':
+                return dic['Value']
+        return None
+
+
+
